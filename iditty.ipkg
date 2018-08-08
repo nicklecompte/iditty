@@ -1,0 +1,7 @@
+package Iditty
+
+sourcedir = src
+
+modules = Common.TwoDArray,
+          Graphics.PrimitiveTypes.Rectangles,
+          Graphics.PrimitiveTypes.RectangleBorders
