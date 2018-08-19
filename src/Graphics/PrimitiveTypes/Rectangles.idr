@@ -18,11 +18,12 @@ data Rectangle : Nat -> Nat -> Type where
     ||| @ rhsLow - the rectangle in the lower right-hand corner. In the example this would be SimpleRect 3 1.
     ||| @ lhsHigh - the rectangle in the upper left-hand corner. In the example this would be SimpleRect 1 2.
     ||| @ rhsHigh - the rectangle in the upper right-hand corner. In the example this would be SimpleRect 3 2.
-    SumRect :   (lhsLow : Rectangle x1 y1) -> 
+    SumRect :   {x: Nat} -> {y: Nat} -> {pfx: plus x1 x2 = x} -> {pfy: plus y1 y2 = y} ->
+                (lhsLow : Rectangle x1 y1) -> 
                 (rhsLow : Rectangle x2 y1) -> 
                 (lhsHigh : Rectangle x1 y2) ->  
                 (rhsHigh : Rectangle x2 y2) -> 
-                Rectangle (x1+x2) (y1+y2)
+                Rectangle x y
 
 ||| Helper function for casting a rectangle to its width (x)            
 rectangleWidth: Rectangle x y -> Nat
@@ -32,26 +33,32 @@ rectangleWidth {x} r = x
 rectangleHeight: Rectangle x y -> Nat
 rectangleHeight {y} r = y
 
-||| Create a row of length x and width 1. Built using lower rects as a matter of convention. It "shouldn't" matter :)
-rowMaker : (x:Nat) -> Rectangle x (S Z)
-rowMaker Z = SingleRect Z (S Z)
-rowMaker (S k) = SumRect (SingleRect (S Z) (S Z)) (rowMaker k) (SingleRect (S Z) Z) (SingleRect k Z)
+-- ||| Create a row of 1x1 rectangles, length x and width 1. Built using lower rects as a matter of convention. It "shouldn't" matter :)
+-- rowMaker : (x:Nat) -> Rectangle x (S Z)
+-- rowMaker Z = SingleRect Z (S Z)
+-- rowMaker (S Z) = SingleRect (S Z) (S Z)
+-- rowMaker (S k) = SumRect (SingleRect (S Z) (S Z)) (rowMaker k) (SingleRect (S Z) Z) (SingleRect k Z)
 
-||| Create a row of length 1 and width y. Built using left rects as a matter of convention. It "shouldn't" matter :)
-colMaker : (y:Nat) -> Rectangle (S Z) y
-colMaker Z = SingleRect (S Z) Z
-colMaker (S k) = SumRect (SingleRect (S Z) (S Z)) (SingleRect Z (S Z)) (colMaker k) (SingleRect Z k)
+-- ||| Create a row of length 1 and width y. Built using left rects as a matter of convention. It "shouldn't" matter :)
+-- colMaker : (y:Nat) -> Rectangle (S Z) y
+-- colMaker Z = SingleRect (S Z) Z
+-- colMaker (S Z) = SingleRect (S Z) (S Z)
+-- colMaker (S k) = SumRect (SingleRect (S Z) (S Z)) (SingleRect Z (S Z)) (colMaker k) (SingleRect Z k)
 
 ||| View of a rectangle as a sum of rows
 data RectangleRow : (Rectangle x y) -> Type where
-    ||| Row representation of an empty rectangle
+    ||| Row representation of an empty row rectangle of length x.
     Empty: (x:Nat) -> RectangleRow (SingleRect x Z)
+    ||| A single vector of x 1x1 rows.
     SingleRow : (x:Nat) -> RectangleRow (SingleRect x (S Z))
+    ||| A SingleRect x y is y rows of length x.
     Rows : Vect y (RectangleRow (SingleRect x (S Z))) -> RectangleRow (SingleRect x y)
+    ||| A row representation of a SumRect is the sum of four RectangleRows
     SumRows: {lhsLoRect: Rectangle x1 y1} -> {rhsLoRect: Rectangle x2 y1} -> {lhsHiRect: Rectangle x1 y2} -> {rhsHiRect: Rectangle x2 y2} ->
              RectangleRow lhsLoRect -> RectangleRow rhsLoRect -> RectangleRow lhsHiRect -> RectangleRow rhsHiRect ->
              RectangleRow (SumRect lhsLoRect rhsLoRect lhsHiRect rhsHiRect)
 
+            
 rectToRectangleRow_rhs_4 : (x:Nat) -> (y:Nat) -> Vect y (RectangleRow (SingleRect x 1))
 rectToRectangleRow_rhs_4 x Z = []
 rectToRectangleRow_rhs_4 x (S k) = (SingleRow x) :: (rectToRectangleRow_rhs_4 x k)
@@ -78,13 +85,54 @@ equalNatsgiveEqualRects a b = rewrite b in (rewrite a in Refl)
 implementation [rectUninhabited1] Uninhabited (SingleRect x y = SumRect lhsLow rhsLow lhsHigh rhsHigh) where
     uninhabited Refl impossible
 
-implementation [rectUninhabited2] Uninhabited (SumRect lhsLow rhsLow lhsHigh rhsHigh = SingleRect x y) where
+implementation [rectUninhabitsed2] Uninhabited (SumRect lhsLow rhsLow lhsHigh rhsHigh = SingleRect x y) where
     uninhabited Refl impossible    
 
 
-||| Proofs that (x1,y1) is contained in a rectangle x y
+||| Proof that a SumRect is not a SingleRect
+data IsSingle : Rectangle x y -> Type where
+    ItIsSingle : IsSingle (SingleRect x y)
+
+implementation [singlecantbesumrect] Uninhabited (IsSingle (SumRect a b c d)) where
+    uninhabited IsSingle impossible
+
+using implementation singlecantbesumrect
+    ||| A decision procedure for IsSingle
+    isItSingle : (rect: Rectangle x y) -> Dec (IsSingle rect)
+    isItSingle (SingleRect x y) = Yes ItIsSingle
+    isItSingle (SumRect _ _ _ _) = No absurd
+
+||| A PrimitiveSumRect is a specific SumRect where the constituents are SingleRects    
+data PrimitiveSumRect : Rectangle x1 y1 -> Rectangle x2 y1 -> Rectangle x1 y2 -> Rectangle x2 y2 -> Type where
+    MkPrimSumRect : PrimitiveSumRect (SingleRect x1 y1) (SingleRect x2 y1) (SingleRect x1 y2) (SingleRect x2 y2)
+
+||| Proofs of equality for rectangles.
+data EqualRect : Rectangle x y -> Rectangle x y -> Type where
+    ||| There is only one SingleRect of Rectangle x y.
+    EqualSingle : EqualRect (SingleRect x y) (SingleRect x y)
+    ||| SumRects are equal if their constituent parts are equal.
+    EqualSum: (EqualRect lhsLow1 lhsLow2) -> (EqualRect rhsLow1 rhsLow2) -> (EqualRect lhsHigh1 lhsHigh2) -> (EqualRect rhsHigh1 rhsHigh2) ->
+                EqualRect (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) (SumRect lhsLow2 rhsLow2 lhsHigh2 rhsHigh2)
+
+implementation [singleAndSumNotEqual] Uninhabited (EqualRect (SingleRect x y) (SumRect a b c d)) where
+    uninhabited EqualRect impossible
+
+data EqualPrimitiveSumRect : Rectangle x y -> Rectangle x y -> Type where    
+-- using implementation rectUninhabited1
+--     DecEq (Rectangle x y) where    
+--         decEq (SingleRect x y) (SingleRect x y) = Yes Refl
+--         decEq (SingleRect (x1+x2) (y1+y2)) (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) = ?h
+--         decEq (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) (SumRect lhsLow2 rhsLow2 lhsHigh2 rhsHigh2) = ?hi
+
+--  decEq {x} {y} {lhsLow: Rectangle x1 y1} {lhsHigh: Rectangle x1 y2} {rhsLow: Rectangle x2 y1} {rhsHigh: Rectangle x2 y2} {pfx: x = x1 + x2} {pfy: y = y1 + y2} (SumRect lhsLow rhsLow lhsHigh rhsHigh) (SumRect lhsLow rhsLow lhsHigh rhsHigh) = ?h
+--  decEq (SingleRect x y) (SumRect _ _ _ _) = ?deh1
+--  decEq (SumRect lhsLow rhsLow lhsHigh rhsHigh) (SingleRect x y) = ?deh2
+
+||| Definition of containment for a coordinate (x1,y1) in a rectangle x y.
 data ContainedCoordinate : (rect:Rectangle x y) -> Type where
+    ||| The type defines containment here, not the nature of the rectangle. We make LTE explicit to give the compiler a break :) Maybe not necessary.
     IsInRectangle : (x1:Nat) -> (y1:Nat) -> (pfX: (LTE x1 x)) -> (pfY : LTE y1 y) -> ContainedCoordinate rect
+
 
 
 ||| A simple datatype to convey which quadrant a sumrect component is in, without having to reference the constuctor
@@ -120,7 +168,7 @@ coordInQuadrantView: (rect: Rectangle x y) -> ContainedCoordinate rect -> (subRe
 --coordInQuadrantView {auto pfx: plus x1 x2 = x} {auto pfy: plus y1 y2 = y} (SumRect lhsLow rhsLow lhsHigh rhsHigh) cc = ?coordInQuadrantView_rhs_2
 
 
-||| Lemma static that a SumRect will always map to a quadrant
+||| Lemma stating that a SumRect will always map to a quadrant
 ifNoQuadrantThenNotSumRect : {rect: Rectangle x y} -> {x1: Nat} -> {y1: Nat} -> {auto pfx: LTE x1 x} -> {auto pfy: LTE y1 y} -> (rect = SumRect _ _ _ _) -> (coordToQuadrant rect x1 y1 = Nothing) -> Void
 ifNoQuadrantThenNotSumRect {rect} {x1} {y1} prfSumRect prfNoCoord = ?ifNoQuadrantThenNotSumRect_rhs
 
