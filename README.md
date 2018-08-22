@@ -18,7 +18,7 @@ In Haskell-land, 1/2 would be vtty, the third is brick. Mine will be crappier, b
 
 Since this is written in Idris, it is primarily a research project and should not be confused with production-level software. Even if I were a competent Idris developer.
 
-### Benefits of# strong typing in terminal applications
+### Benefits of strong typing in terminal applications
 
 In my view, there are three common sticking points with applications that use text-based terminal UIs:
 
