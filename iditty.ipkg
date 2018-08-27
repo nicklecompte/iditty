@@ -1,5 +1,7 @@
 package Iditty
 
+opts = "-p contrib"
+
 sourcedir = src
 
 modules = Common.TwoDArray,

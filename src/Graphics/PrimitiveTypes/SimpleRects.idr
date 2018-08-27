@@ -1,6 +1,6 @@
 module Graphics.PrimitiveTypes.SimpleRects
 
-import Data.Vect
+import Decidable.Order
 
 %access public export
 %default total
@@ -9,110 +9,75 @@ import Data.Vect
 --                                 Definitions                                --
 --------------------------------------------------------------------------------
 
-
-||| A datatype representing a very simple rectangle.
-record SimpleRect where
-    constructor MkSimpleRect
-    width: Nat
-    height: Nat
-
-data ThinnerOrThinAs : (thinner:SimpleRect) -> (thicker:SimpleRect) -> Type where
-    ZeroWidth : {y1:Nat} -> (thicker: SimpleRect) -> ThinnerOrThinAs (MkSimpleRect Z y1) thicker
-    IfThinnerHoldsThenSuccHolds : (ThinnerOrThinAs (MkSimpleRect x1 y1) (MkSimpleRect x2 y2)) -> 
-                                    ThinnerOrThinAs (MkSimpleRect (S x1) y1) (MkSimpleRect (S x2) y2)
-
-data ShorterOrShortAs : (shorter:SimpleRect) -> (taller:SimpleRect) -> Type where
-    ZeroHeight : {x1:Nat} -> (taller: SimpleRect) -> ShorterOrShortAs (MkSimpleRect x1 Z) taller
-    IfShorterHoldsThenSuccHolds : (ShorterOrShortAs (MkSimpleRect x1 y1) (MkSimpleRect x2 y2)) -> 
-                                    ShorterOrShortAs (MkSimpleRect x1 (S y1)) (MkSimpleRect x2 (S y2))
-
--------------------------------------------------------------------------------
---                                 Axioms                                    --
---------------------------------------------------------------------------------
+||| Really just Nat*Nat, but given a more descriptive name so I don't get confused via overutilization of primitives. 
+||| Smarter devs may have different opinions :)
+record SimpleRectangle where
+  constructor MkRect
+  width: Nat
+  height: Nat
 
 
-Uninhabited ((MkSimpleRect x y) = (MkSimpleRect (S x) y)) where
-    uninhabited Refl impossible
+--- name hints
+% name SimpleRectangle rect1, rect2, rect3, rectToRectangleRow_rhs_4
 
-Uninhabited ((MkSimpleRect (S x) y) = (MkSimpleRect x y)) where
-    uninhabited Refl impossible
+----------------------------------------------------------------------------------
+--                                  Uninhabited                                 --
+----------------------------------------------------------------------------------
 
-Uninhabited ((MkSimpleRect x y) = (MkSimpleRect x (S y))) where
-    uninhabited Refl impossible
-
-Uninhabited ((MkSimpleRect x (S y)) = (MkSimpleRect x y)) where
-    uninhabited Refl impossible
-
---------------------------------------------------------------------------------
---                         Simple helper lemmas                               --
---------------------------------------------------------------------------------
-
-||| If SimpleRects are equal, their heights are equal.
-equalRectToEqualHeight: {a: SimpleRect} -> {b: SimpleRect} -> (a = b) -> (height a = height b)
-equalRectToEqualHeight Refl = Refl
-
-||| If SimpleRects are equal, their widths are equal.
-equalRectToEqualWidth: {a: SimpleRect} -> {b: SimpleRect} -> (a = b) -> (width a = width b)
-equalRectToEqualWidth Refl = Refl
-
-||| Add one to the width.
-increaseSimpleWidth: SimpleRect -> SimpleRect
-increaseSimpleWidth (MkSimpleRect width height) = (MkSimpleRect (S width) height)
-
-||| Increasing the width increases the width :)
-increaseWidthIncreases: {a: SimpleRect} -> ((width a) = w) -> ((width (increaseSimpleWidth a)) = S w)
-increaseWidthIncreases {a = (MkSimpleRect w k)} Refl = Refl
-
-||| Can't increase a width to zero.
-implementation [cantIncreaseWidthToZero] Uninhabited ((increaseSimpleWidth a) = (MkSimpleRect Z y)) where
-    uninhabited {a = (MkSimpleRect _ _)} Refl impossible
-
-||| Increasing width preserves equality.
-increaseSimpleWidthPreservesEquality: (a: SimpleRect) -> (b: SimpleRect) -> (a=b) -> ((increaseSimpleWidth a) = (increaseSimpleWidth b))
-increaseSimpleWidthPreservesEquality b b Refl = Refl
-
-||| Increasing width is injective.
-increaseSimpleWidthIsInjective: (a: SimpleRect) -> (b: SimpleRect) -> ((increaseSimpleWidth a) = (increaseSimpleWidth b)) -> (a=b) 
-increaseSimpleWidthIsInjective (MkSimpleRect width height) (MkSimpleRect width height) Refl = Refl
-
-||| Add one to the height.
-increaseSimpleHeight: SimpleRect -> SimpleRect
-increaseSimpleHeight (MkSimpleRect width height) = (MkSimpleRect width (S height))
-
-||| Increasing the width increases the width :)
-increaseHeightIncreases: {a: SimpleRect} -> ((height a) = h) -> ((height (increaseSimpleHeight a)) = S h)
-increaseHeightIncreases {a = (MkSimpleRect w k)} Refl = Refl
-
-||| Can't increase a width to zero.
-implementation [cantIncreaseHeightToZero] Uninhabited ((increaseSimpleHeight a) = (MkSimpleRect x Z)) where
-    uninhabited {a = (MkSimpleRect _ _)} Refl impossible
-
-||| Increasing height preserves equality.
-increaseSimpleHeightPreservesEquality: (a: SimpleRect) -> (b: SimpleRect) -> (a=b) -> ((increaseSimpleHeight a) = (increaseSimpleHeight b))
-increaseSimpleHeightPreservesEquality b b Refl = Refl
-
-||| Increasing height is injective.
-increaseSimpleHeightIsInjective: (a: SimpleRect) -> (b: SimpleRect) -> ((increaseSimpleHeight a) = (increaseSimpleHeight b)) -> (a=b) 
-increaseSimpleHeightIsInjective (MkSimpleRect width height) (MkSimpleRect width height) Refl = Refl
 
 
 ----------------------------------------------------------------------------------
---                                   Equality                                   --
+--                                   Comparison                                 --
 ----------------------------------------------------------------------------------
 
-||| Equality for simple rects is trivial - if they're the same size, they're the same rect.
-Eq (SimpleRect) where
-    (==) (MkSimpleRect x1 y1) (MkSimpleRect x2 y2) = (x1 == x2) && (y1 == y2)
+||| Lemma stating that rect1 = rect2 ==> (x rect1) = (x rect2)
+equalSimpleRectsMustHaveEqualWidth : {rect1: SimpleRectangle} -> {rect2: SimpleRectangle} -> (pfRect: rect1 = rect2) -> ((width rect1) = (width rect2))
+equalSimpleRectsMustHaveEqualWidth {rect1 = (MkRect k j)} {rect2 = (MkRect k j)} Refl = Refl
 
-h : (contraH : (height1 = height2) -> Void) -> (pfW : width1 = width2) -> (MkSimpleRect width1 height1 = MkSimpleRect width2 height2) -> Void
-h contraH pfW prf = contraH (equalRectToEqualHeight prf)
+||| Lemma stating that (x1 /= x2) -> (MkRect x1 _) /= (MkRect x2 _)
+equalSimpleRectsMustHaveEqualHeight : {rect1: SimpleRectangle} -> {rect2: SimpleRectangle} -> (pfRect: rect1 = rect2) -> ((height rect1) = (height rect2))
+equalSimpleRectsMustHaveEqualHeight {rect1 = (MkRect k j)} {rect2 = (MkRect k j)} Refl = Refl
 
-||| DecidableEquality for SimpleRects is a bit tricker but still pretty simple - it's a matter of prop equality of the construtor arguments.
-DecEq (SimpleRect) where
-  decEq (MkSimpleRect width1 height1) (MkSimpleRect width2 height2) = case decEq width1 width2 of
-                                                                           Yes pfW => case decEq height1 height2 of
-                                                                                            Yes pfH => Yes (rewrite pfW in (rewrite pfH in Refl))
-                                                                                            No contraH => No (\prf => contraH (equalRectToEqualHeight prf))
-                                                                           No contraW => No (\prf => contraW (equalRectToEqualWidth prf))
+Eq (SimpleRectangle) where
+  (==) rect1 rect2 = ((width rect1) == (width rect2)) && ((height rect1) == (height rect2))
 
-                                                                           
+DecEq (SimpleRectangle) where
+  decEq (MkRect x1 y1) (MkRect x2 y2) = case decEq x1 x2 of
+                                          Yes pfx => case decEq y1 y2 of
+                                                      Yes pfy => Yes (rewrite pfx in (rewrite pfy in Refl))
+                                                      No contray => No (\rectEquality => (contray (equalSimpleRectsMustHaveEqualHeight rectEquality)))
+                                          No contrax => No (\rectEquality => (contrax (equalSimpleRectsMustHaveEqualWidth rectEquality))) -- decEq rect1 rect2 = case decEq (x rect1) (x rect2) of
+  --                       Yes pfx => case decEq (y rect1) (y rect2) of
+  --                                   Yes pfy => Yes Refl
+  --                                   No contraY => No ?noYH
+  --                       No contraX => No ?noH
+
+data SimpleRectanglePartialOrdering: (smaller: SimpleRectangle) -> (bigger: SimpleRectangle) -> Type where
+  Equal: SimpleRectanglePartialOrdering rect rect
+  Contained: {pfx: LT x1 x2} -> {pfy: LT y1 y2} -> SimpleRectanglePartialOrdering (MkRect x1 y1) (MkRect x2 y2)
+
+||| `LT` is transitive
+ltTransitive : LT n m -> LT m p -> LT n p
+ltTransitive (LTESucc LTEZero) (LTESucc (LTESucc x)) = LTESucc (LTEZero)
+ltTransitive (LTESucc (LTESucc x)) (LTESucc (LTESucc y)) = LTESucc (lteTransitive (LTESucc x) (lteSuccRight y))
+
+Preorder SimpleRectangle SimpleRectanglePartialOrdering where
+  transitive (MkRect x2 y2) (MkRect x2 y2) (MkRect x2 y2) Equal Equal = Equal
+  transitive (MkRect x2 y2) (MkRect x2 y2) (MkRect x3 y3) Equal (Contained {pfx} {pfy}) = (Contained {pfx} {pfy})
+  transitive (MkRect x1 y1) (MkRect x2 y2) (MkRect x2 y2) (Contained {pfx} {pfy}) Equal = (Contained {pfx} {pfy})
+  transitive (MkRect x1 y1) (MkRect x2 y2) (MkRect x3 y3) (Contained {pfx=pfx12} {pfy=pfy12}) (Contained {pfx=pfx23} {pfy=pfy23}) = Contained {pfx = (ltTransitive pfx12 pfx23)} {pfy = (ltTransitive pfy12 pfy23)}
+  reflexive a = Equal
+
+  -- transitive (MkRect k j) (MkRect k j) (MkRect k j) Equal Equal = Equal
+  -- transitive (MkRect k j) (MkRect k j) (MkRect i n) Equal (Contained {pfx} {pfy}) = (Contained {pfx} {pfy}) 
+  -- transitive (MkRect width height) (MkRect k j) (MkRect k j) (Contained {pfx} {pfy}) Equal = (Contained {pfx} {pfy})
+  -- transitive (MkRect width height) (MkRect k j) (MkRect i n) (Contained {pfx=pfx1} {pfy=pfy1}) (Contained {pfx=pfx2} {pfy=pfy2}) = 
+  --   Contained {pfx = (lteTransitive pfx1 pfx2)} {pfy = (lteTransitive pfy1 pfy2)}
+--  reflexive a = Equal
+
+-- Poset SimpleRectangle SimpleRectanglePartialOrdering where
+--   antisymmetric (MkRect x2 y2) (MkRect x2 y2) Equal Equal = Refl
+--   antisymmetric (MkRect x2 y2) (MkRect x2 y2) Equal Contained = ?Poset_rhs_4
+--   antisymmetric (MkRect x1 y1) (MkRect x1 y1) Contained Equal = ?Poset_rhs_2
+--   antisymmetric (MkRect x1 y1) (MkRect x2 y2) Contained Contained = ?Poset_rhs_5
+
