@@ -4,8 +4,9 @@ opts = "-p contrib"
 
 sourcedir = src
 
-modules = Common.TwoDArray,
-          Graphics.PrimitiveTypes.SimpleRects,
-          Graphics.PrimitiveTypes.Rectangles,
-          Graphics.PrimitiveTypes.RectangleBorders,
-          Main
+modules =   Common.ArithmeticHelpers,
+            Common.TwoDArray,
+            Graphics.PrimitiveTypes.SimpleRects,
+            Graphics.PrimitiveTypes.Rectangles,
+            Graphics.PrimitiveTypes.RectangleBorders,
+            Main

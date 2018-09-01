@@ -1,6 +1,7 @@
 module Graphics.PrimitiveTypes.SimpleRects
 
 import Decidable.Order
+import Common.ArithmeticHelpers
 
 %access public export
 %default total
@@ -18,7 +19,7 @@ record SimpleRectangle where
 
 
 --- name hints
-% name SimpleRectangle rect1, rect2, rect3, rectToRectangleRow_rhs_4
+% name SimpleRectangle rect1, rect2, rect3, rect4
 
 ----------------------------------------------------------------------------------
 --                                  Uninhabited                                 --
@@ -47,37 +48,35 @@ DecEq (SimpleRectangle) where
                                                       Yes pfy => Yes (rewrite pfx in (rewrite pfy in Refl))
                                                       No contray => No (\rectEquality => (contray (equalSimpleRectsMustHaveEqualHeight rectEquality)))
                                           No contrax => No (\rectEquality => (contrax (equalSimpleRectsMustHaveEqualWidth rectEquality))) -- decEq rect1 rect2 = case decEq (x rect1) (x rect2) of
-  --                       Yes pfx => case decEq (y rect1) (y rect2) of
-  --                                   Yes pfy => Yes Refl
-  --                                   No contraY => No ?noYH
-  --                       No contraX => No ?noH
+
+data StrictlyContainedRectangle: (smaller: SimpleRectangle) -> (bigger: SimpleRectangle) -> Type where
+  IsContained: (rect1: SimpleRectangle) -> (rect2: SimpleRectangle) -> {pfx: LT (width rect1) (width rect2)} -> {pfy: LT (height rect1) (height rect2)} -> StrictlyContainedRectangle rect1 rect2
+
+Uninhabited (StrictlyContainedRectangle a a) where
+  uninhabited (IsContained a a {pfx} {pfy}) = absurd pfx -- using Uninhabited (LT a a)
+
+using (a: SimpleRectangle)
+  using (b: SimpleRectangle)
+    using (containment: StrictlyContainedRectangle a b)
+      implementation [strictContainedNotSymmetric] Uninhabited (StrictlyContainedRectangle b a) where
+        uninhabited x = ?h
 
 data SimpleRectanglePartialOrdering: (smaller: SimpleRectangle) -> (bigger: SimpleRectangle) -> Type where
-  Equal: SimpleRectanglePartialOrdering rect rect
-  Contained: {pfx: LT x1 x2} -> {pfy: LT y1 y2} -> SimpleRectanglePartialOrdering (MkRect x1 y1) (MkRect x2 y2)
-
-||| `LT` is transitive
-ltTransitive : LT n m -> LT m p -> LT n p
-ltTransitive (LTESucc LTEZero) (LTESucc (LTESucc x)) = LTESucc (LTEZero)
-ltTransitive (LTESucc (LTESucc x)) (LTESucc (LTESucc y)) = LTESucc (lteTransitive (LTESucc x) (lteSuccRight y))
+  Equal: (rect: SimpleRectangle) -> SimpleRectanglePartialOrdering rect rect
+  Contained: StrictlyContainedRectangle a b -> SimpleRectanglePartialOrdering a b
 
 Preorder SimpleRectangle SimpleRectanglePartialOrdering where
-  transitive (MkRect x2 y2) (MkRect x2 y2) (MkRect x2 y2) Equal Equal = Equal
-  transitive (MkRect x2 y2) (MkRect x2 y2) (MkRect x3 y3) Equal (Contained {pfx} {pfy}) = (Contained {pfx} {pfy})
-  transitive (MkRect x1 y1) (MkRect x2 y2) (MkRect x2 y2) (Contained {pfx} {pfy}) Equal = (Contained {pfx} {pfy})
-  transitive (MkRect x1 y1) (MkRect x2 y2) (MkRect x3 y3) (Contained {pfx=pfx12} {pfy=pfy12}) (Contained {pfx=pfx23} {pfy=pfy23}) = Contained {pfx = (ltTransitive pfx12 pfx23)} {pfy = (ltTransitive pfy12 pfy23)}
-  reflexive a = Equal
+  transitive r r r (Equal r) (Equal r) = Equal r
+  transitive r r r1 (Equal r) (Contained (IsContained r r1 {pfx} {pfy})) = (Contained (IsContained r r1 {pfx} {pfy}))
+  transitive r r1 r1 (Contained x) (Equal r1) = Contained x
+  transitive r1 r2 r3 (Contained (IsContained r1 r2 {pfx=pfx12} {pfy=pfy12})) (Contained (IsContained r2 r3 {pfx=pfx23} {pfy=pfy23})) =
+    Contained (IsContained r1 r3 {pfx = ltTransitive pfx12 pfx23} {pfy = ltTransitive pfy12 pfy23})
+  reflexive a = Equal a
 
-  -- transitive (MkRect k j) (MkRect k j) (MkRect k j) Equal Equal = Equal
-  -- transitive (MkRect k j) (MkRect k j) (MkRect i n) Equal (Contained {pfx} {pfy}) = (Contained {pfx} {pfy}) 
-  -- transitive (MkRect width height) (MkRect k j) (MkRect k j) (Contained {pfx} {pfy}) Equal = (Contained {pfx} {pfy})
-  -- transitive (MkRect width height) (MkRect k j) (MkRect i n) (Contained {pfx=pfx1} {pfy=pfy1}) (Contained {pfx=pfx2} {pfy=pfy2}) = 
-  --   Contained {pfx = (lteTransitive pfx1 pfx2)} {pfy = (lteTransitive pfy1 pfy2)}
---  reflexive a = Equal
+Poset SimpleRectangle SimpleRectanglePartialOrdering where
+  antisymmetric b b (Equal b) (Equal b) = Refl
+  antisymmetric b b (Equal b) (Contained x) = Refl
+  antisymmetric a a (Contained x) (Equal a) = Refl
+  antisymmetric a b (Contained (IsContained a b {pfx=pfx1})) (Contained (IsContained b a {pfx=pfx2})) = absurd (ltGoesOneWay pfx1 pfx2)
 
--- Poset SimpleRectangle SimpleRectanglePartialOrdering where
---   antisymmetric (MkRect x2 y2) (MkRect x2 y2) Equal Equal = Refl
---   antisymmetric (MkRect x2 y2) (MkRect x2 y2) Equal Contained = ?Poset_rhs_4
---   antisymmetric (MkRect x1 y1) (MkRect x1 y1) Contained Equal = ?Poset_rhs_2
---   antisymmetric (MkRect x1 y1) (MkRect x2 y2) Contained Contained = ?Poset_rhs_5
 
