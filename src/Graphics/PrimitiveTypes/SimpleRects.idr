@@ -39,6 +39,14 @@ equalSimpleRectsMustHaveEqualWidth {rect1 = (MkRect k j)} {rect2 = (MkRect k j)}
 equalSimpleRectsMustHaveEqualHeight : {rect1: SimpleRectangle} -> {rect2: SimpleRectangle} -> (pfRect: rect1 = rect2) -> ((height rect1) = (height rect2))
 equalSimpleRectsMustHaveEqualHeight {rect1 = (MkRect k j)} {rect2 = (MkRect k j)} Refl = Refl
 
+-- ||| Lemma stating that equal height and equal width ==> equal SimpleRectangles
+-- equalDimensionsImpliesEqualSimpleRect: (rect1: SimpleRectangle) -> (rect2: SimpleRectangle) -> (pfWidth: ((width rect1) = (width rect2))) -> (pfHeight: ((height rect1) = (height rect2))) -> (rect1 = rect2)
+-- equalDimensionsImpliesEqualSimpleRect rect1 rect2 pfWidth pfHeight = ?equalDimensionsImpliesEqualSimpleRect_rhs
+
+||| Lemma for rewriting SimpleRectangles as MkRect
+simpleRectRewriteLemma: (r: SimpleRectangle) -> (r = (MkRect (width r) (height r)))
+simpleRectRewriteLemma (MkRect k j) = Refl
+
 Eq (SimpleRectangle) where
   (==) rect1 rect2 = ((width rect1) == (width rect2)) && ((height rect1) == (height rect2))
 
@@ -55,11 +63,11 @@ data StrictlyContainedRectangle: (smaller: SimpleRectangle) -> (bigger: SimpleRe
 Uninhabited (StrictlyContainedRectangle a a) where
   uninhabited (IsContained a a {pfx} {pfy}) = absurd pfx -- using Uninhabited (LT a a)
 
-using (a: SimpleRectangle)
-  using (b: SimpleRectangle)
-    using (containment: StrictlyContainedRectangle a b)
-      implementation [strictContainedNotSymmetric] Uninhabited (StrictlyContainedRectangle b a) where
-        uninhabited x = ?h
+-- using (a: SimpleRectangle)
+--   using (b: SimpleRectangle)
+--     using (containment: StrictlyContainedRectangle a b)
+--       implementation [strictContainedNotSymmetric] Uninhabited (StrictlyContainedRectangle b a) where
+--         uninhabited x = ?h
 
 data SimpleRectanglePartialOrdering: (smaller: SimpleRectangle) -> (bigger: SimpleRectangle) -> Type where
   Equal: (rect: SimpleRectangle) -> SimpleRectanglePartialOrdering rect rect

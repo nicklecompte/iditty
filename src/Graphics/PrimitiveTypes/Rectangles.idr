@@ -28,6 +28,15 @@ data Rectangle : SimpleRectangle -> Type where
                 Rectangle (MkRect x y)
 
 
+||| A simple datatype to convey which quadrant a sumrect component is in, without having to reference the constuctor
+data RectangleQuadrant = 
+    LHSLow |
+    LHSHigh |
+    RHSLow |
+    RHSHigh             
+    
+    
+
 --------------------------------------------------------------------------------
 --                                 Uninhabited/Void                           --
 --------------------------------------------------------------------------------
@@ -46,9 +55,17 @@ Uninhabited (SumRect _ _ _ _ = SingleRect _) where
 rectangleWidth: (rect: Rectangle a) -> Nat
 rectangleWidth {a} rect = width a
 
+||| Two Rectangles with the same underlying SimpleRectangle have the same width.
+rectangleWidthsAreEqual: (rect1: Rectangle a) -> (rect2: Rectangle a) -> ((rectangleWidth rect1) = (rectangleWidth rect2))
+rectangleWidthsAreEqual rect1 rect2 {a} = Refl
+
 ||| Get the height of the underlying SimpleRectangle.
 rectangleHeight: (rect: Rectangle a) -> Nat
 rectangleHeight {a} rect = height a
+
+||| Two Rectangles with the same underlying SimpleRectangle have the same width.
+rectangleHeightsAreEqual: (rect1: Rectangle a) -> (rect2: Rectangle a) -> ((rectangleHeight rect1) = (rectangleHeight rect2))
+rectangleHeightsAreEqual rect1 rect2 {a} = Refl
 
 ||| Get the underlying SimpleRectangle.
 toSimpleRect: Rectangle a -> SimpleRectangle
@@ -60,6 +77,187 @@ rectangleShoehorner rect b {a} = case decEq a b of
                                     Yes prfSameSimpleRectangle => Just (replace prfSameSimpleRectangle rect)
                                     No _ => Nothing
 
+||| Replace a SimpleRectangle r with a MkRect (width r) (height r)
+replaceSimpleRect: (rect: Rectangle r) -> Rectangle (MkRect (width r) (height r))
+replaceSimpleRect rect {r} = replace (simpleRectRewriteLemma r) rect
+
+||| Replace a SimpleRectangle r with a SimpleRectangle s if r = s
+replaceSimpleRectGeneral: (rect: Rectangle r) -> {s: SimpleRectangle} -> (r = s) -> Rectangle s
+replaceSimpleRectGeneral rect pf = replace pf rect
+
+||| Replacing a SimpleRectangle preserves equality.
+replaceSimpleRectEquality: {rect: Rectangle r} -> {s: SimpleRectangle} -> {pf: (r = s)} -> (rect = (replaceSimpleRectGeneral rect {s} pf))
+replaceSimpleRectEquality {rect = rect} {r = (MkRect width height)} {s = (MkRect width height)} {pf = Refl} = Refl
+
+
+||| Helper function for pulling a tuple of (length, height) out as a dependent pair
+rectToDepPair : (rect:Rectangle r) -> (a:(Nat,Nat)**(Rectangle (MkRect (fst a) (snd a))))
+rectToDepPair rect = let a = (rectangleWidth rect, rectangleHeight rect) in
+                        (a ** (replaceSimpleRect rect))
+
+
+||| Simple helper method mapping a quadrant to Nothing for a SingleRect and to the appropriate component for a SumRect
+quadrantToRect: RectangleQuadrant -> (Rectangle r) -> Maybe (a:(Nat,Nat)**(Rectangle (MkRect (fst a) (snd a))))
+quadrantToRect _ (SingleRect _) = Nothing
+quadrantToRect x (SumRect lhsLow rhsLow lhsHigh rhsHigh) = case x of
+                                                            LHSLow => Just (rectToDepPair lhsLow)
+                                                            LHSHigh => Just (rectToDepPair lhsHigh)
+                                                            RHSLow => Just (rectToDepPair rhsLow)
+                                                            RHSHigh => Just (rectToDepPair rhsHigh)    
+
+||| Helper function for pulling a tuple of (length, height) out as a dependent pair from a pair of equal-sized Rectangles.
+rectPairToDepPair : (rect1:Rectangle r) -> (rect2: Rectangle r) -> 
+        (a:(Nat,Nat)**((Rectangle (MkRect (fst a) (snd a))),(Rectangle (MkRect (fst a) (snd a)))))
+rectPairToDepPair rect1 rect2 = let a = (rectangleWidth rect1, rectangleHeight rect1) in
+                                    (a ** ((replaceSimpleRect rect1),(replaceSimpleRect rect2)))
+
+--------------------------------------------------------------------------------
+--                             SumRect Comparison                             --
+--------------------------------------------------------------------------------
+
+
+||| Proofs that two SumRects are "congruent."
+data EqualSizedSumRects: Rectangle a -> Rectangle a -> Type where
+    AreEqualSizedSumRects: 
+        (lowerLHS1: Rectangle rlLHS) ->
+        (lowerRHS1: Rectangle rlRHS) ->
+        (upperLHS1: Rectangle ruLHS) ->
+        (upperRHS1: Rectangle ruRHS) ->
+        (lowerLHS2: Rectangle rlLHS) ->
+        (lowerRHS2: Rectangle rlRHS) ->
+        (upperLHS2: Rectangle ruLHS) ->
+        (upperRHS2: Rectangle ruRHS) ->
+        {x: Nat} -> {y: Nat} -> 
+        {pfxLow1: plus (width rlLHS) (width rlRHS) = x} ->
+        {pfxHigh1: plus (width ruLHS) (width ruRHS) = x} -> 
+        {pfyLeft1: plus (height rlLHS) (height ruLHS) = y} ->
+        {pfyRight1: plus (height rlRHS) (height ruRHS) = y} ->        
+        {pfxLow2: plus (width rlLHS) (width rlRHS) = x} -> -- TODO: we really shouldn't need these.
+        {pfxHigh2: plus (width ruLHS) (width ruRHS) = x} -> 
+        {pfyLeft2: plus (height rlLHS) (height ruLHS) = y} ->
+        {pfyRight2: plus (height rlRHS) (height ruRHS) = y} ->        
+        EqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {pfxLow = pfxLow1} {pfxHigh = pfxHigh1} {pfyLeft = pfyLeft1} {pfyRight = pfyRight1}) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {pfxLow = pfxLow2} {pfxHigh = pfxHigh2} {pfyLeft = pfyLeft2} {pfyRight = pfyRight2})
+
+
+
+Uninhabited (EqualSizedSumRects _ (SingleRect _)) where
+    uninhabited (AreEqualSizedSumRects _ _ _ _ _ _ _ _) impossible
+
+Uninhabited (EqualSizedSumRects (SingleRect _) _) where
+    uninhabited (AreEqualSizedSumRects _ _ _ _ _ _ _ _) impossible
+
+||| EqualSizedSumRects is a symmetric relation.
+equalSizedSumRectIsReflexive: (EqualSizedSumRects a b) -> (EqualSizedSumRects b a)
+equalSizedSumRectIsReflexive (AreEqualSizedSumRects lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) = 
+        (AreEqualSizedSumRects lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 )
+
+||| EqualSizedSumRects is transitive.
+equalSizedSumRectIsTransitive: (EqualSizedSumRects a b) -> (EqualSizedSumRects b c) -> (EqualSizedSumRects a c)
+equalSizedSumRectIsTransitive (AreEqualSizedSumRects a b c d e f g h) (AreEqualSizedSumRects e f g h i j k l) = 
+    AreEqualSizedSumRects a b c d i j k l
+
+||| Given an EqualSizedSumRects, get a pair of the quadrants.
+getQuadrant: RectangleQuadrant -> EqualSizedSumRects r1 r2 -> (a:(Nat,Nat)**(Rectangle (MkRect (fst a) (snd a)), Rectangle (MkRect (fst a) (snd a))))
+getQuadrant x (AreEqualSizedSumRects lhsL1 rhsL1 lhsU1 rhsU1 e f g h) =
+    case x of
+        LHSLow => rectPairToDepPair lhsL1 e
+        LHSHigh => rectPairToDepPair lhsU1 g
+        RHSLow => rectPairToDepPair rhsL1 f
+        RHSHigh => rectPairToDepPair rhsU1 h
+
+||| EqualSizedSumRects have same SimpleRect underlying their LLHS.
+sameWidthLHSEqualSizedSumRects: EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> ((toSimpleRect ll1) = (toSimpleRect ll2))
+sameWidthLHSEqualSizedSumRects (AreEqualSizedSumRects ll1 _ _ _ ll2 _ _ _) = Refl
+
+||| Lemma stating that if the LHS of two SumRects don't have equal width, then they cannot be SameSizedSumRects.
+lowerLeftHandSimpleRectMustBeEqualForEqualSizedSumRects : (contraLL : (toSimpleRect ll1 = toSimpleRect ll2) -> Void) -> EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> Void
+lowerLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraLL = 
+        (\essr => (contraLL (sameWidthLHSEqualSizedSumRects essr)))
+
+||| EqualSizedSumRects have same SimpleRect underlying their LRHS.
+sameWidthRHSEqualSizedSumRects: EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> ((toSimpleRect lr1) = (toSimpleRect lr2))
+sameWidthRHSEqualSizedSumRects (AreEqualSizedSumRects _ lr1 _ _ _ lr2 _ _) = Refl
+
+||| Lemma stating that if the ULHS of two SumRects don't have equal width, then they cannot be SameSizedSumRects.
+lowerRightHandSimpleRectMustBeEqualForEqualSizedSumRects : (contraLR : (toSimpleRect lr1 = toSimpleRect lr2) -> Void) -> EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> Void
+lowerRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraLR = 
+    (\essr => (contraLR (sameWidthRHSEqualSizedSumRects essr)))
+
+||| EqualSizedSumRects have same SimpleRect underlying their ULHS.
+sameWidthULHSEqualSizedSumRects: EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> ((toSimpleRect ul1) = (toSimpleRect ul2))
+sameWidthULHSEqualSizedSumRects (AreEqualSizedSumRects _ _ ul1 _ _ _ ul2 _) = Refl
+
+||| Lemma stating that if the ULHS of two SumRects don't have equal width, then they cannot be SameSizedSumRects.
+upperLeftHandSimpleRectMustBeEqualForEqualSizedSumRects : (contraUL : (toSimpleRect ul1 = toSimpleRect ul2) -> Void) -> EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> Void
+upperLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraUL = 
+        (\essr => (contraUL (sameWidthULHSEqualSizedSumRects essr)))
+
+||| EqualSizedSumRects have same SimpleRect underlying their URHS.
+sameWidthURHSEqualSizedSumRects: EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> ((toSimpleRect ur1) = (toSimpleRect ur2))
+sameWidthURHSEqualSizedSumRects (AreEqualSizedSumRects _ _ _ ur1 _ _ _ ur2) = Refl
+
+||| Lemma stating that if the LHS of two SumRects don't have equal width, then they cannot be SameSizedSumRects.
+upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects : (contraUR : (toSimpleRect ur1 = toSimpleRect ur2) -> Void) -> EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1) (SumRect ll2 lr2 ul2 ur2) -> Void
+upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraUR = 
+    (\essr => (contraUR (sameWidthURHSEqualSizedSumRects essr)))
+     
+
+
+||| Lemma stating that if each constituent SimpleRectangle of two SumRects are equal, then the SumRects are equal-sized
+equalSimpleRectsGiveEqualSizedSumRects : 
+    (ll1: Rectangle ll1Simp) -> (ll2: Rectangle ll2Simp) ->
+    (pfLL: ll1Simp = ll2Simp) ->
+    (lr1: Rectangle lr1Simp) -> (lr2: Rectangle lr2Simp) ->
+    (pfLR: lr1Simp = lr2Simp) ->
+    (ul1: Rectangle ul1Simp) -> (ul2: Rectangle ul2Simp) ->
+    (pfUL: ul1Simp = ul2Simp) ->
+    (ur1: Rectangle ur1Simp) -> (ur2: Rectangle ur2Simp) ->
+    (pfUR: ur1Simp = ur2Simp) ->
+    {x: Nat} -> {y: Nat} ->
+    {pfxLow1: plus (width ll1Simp) (width lr1Simp) = x} ->
+    {pfxHigh1: plus (width ul1Simp) (width ur1Simp) = x} -> 
+    {pfyLeft1: plus (height ll1Simp) (height ul1Simp) = y} ->
+    {pfyRight1: plus (height lr1Simp) (height ur1Simp) = y} ->        
+    {pfxLow2: plus (width ll2Simp) (width lr2Simp) = x} ->
+    {pfxHigh2: plus (width ul2Simp) (width ur2Simp) = x} -> 
+    {pfyLeft2: plus (height ll2Simp) (height ul2Simp) = y} ->
+    {pfyRight2: plus (height lr2Simp) (height ur2Simp) = y} ->  
+    EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1 {pfxLow = pfxLow1} {pfxHigh = pfxHigh1} {pfyLeft = pfyLeft1} {pfyRight = pfyRight1}) (SumRect ll2 lr2 ul2 ur2 {pfxLow = pfxLow2} {pfxHigh = pfxHigh2} {pfyLeft = pfyLeft2} {pfyRight = pfyRight2}) -- {pfxLow = pfxLow2} {pfxHigh = pfxHigh2} {pfyLeft = pfyLeft2} {pfyRight = pfyRight2}
+equalSimpleRectsGiveEqualSizedSumRects {ll1Simp = (MkRect width height)} {ll2Simp = (MkRect width height)} ll1 ll2 Refl {lr1Simp = (MkRect k j)} {lr2Simp = (MkRect k j)} lr1 lr2 Refl {ul1Simp = (MkRect i n)} {ul2Simp = (MkRect i n)} ul1 ul2 Refl {ur1Simp = (MkRect m z)} {ur2Simp = (MkRect m z)} ur1 ur2 Refl {x = x} {y = y} {pfxLow1} {pfxHigh1} {pfyLeft1} {pfyRight1} {pfxLow2} {pfxHigh2} {pfyLeft2} {pfyRight2} = 
+    (AreEqualSizedSumRects  ll1 lr1 ul1 ur1 ll2 lr2 ul2 ur2 {x=x} {y=y}
+                            {pfxLow1 = pfxLow1} 
+                            {pfxHigh1 = pfxHigh1} 
+                            {pfyLeft1 = pfyLeft1} 
+                            {pfyRight1 = pfyRight1}    
+                            {pfxLow2 = pfxLow2} 
+                            {pfxHigh2 = pfxHigh2} 
+                            {pfyLeft2 = pfyLeft2} 
+                            {pfyRight2 = pfyRight2}) -- {pfxLow = (the (plus width k = x) pfxLow)} {pfxHigh = (the (plus i m = x) pfxHigh)} {pfyLeft = (the (plus height j = y) pfyLeft)} {pfyRight = (the (plus j z = y) pfyRight)}
+-- -- -- {x = x} {y = y} 
+
+--     EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1 {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect ll2 lr2 ul2 ur2 {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2})
+    
+
+||| Decision procedure for deciding if two Rectangles are EqualSizedSumRects. You might not know this, but the diamond antipattern is Actually Good.
+decEqualSizedSumRects: (r1: Rectangle a) -> (r2: Rectangle a) -> Dec (EqualSizedSumRects r1 r2)
+decEqualSizedSumRects (SingleRect a) _ = No absurd
+decEqualSizedSumRects _ (SingleRect a) = No absurd
+decEqualSizedSumRects (SumRect lowerLHS lowerRHS upperLHS upperRHS) (SingleRect (MkRect x y)) = No absurd
+decEqualSizedSumRects (SumRect ll1 lr1 ul1 ur1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect ll2 lr2 ul2 ur2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2}) = 
+    case decEq (toSimpleRect ll1) (toSimpleRect ll2) of
+        Yes pfLL =>
+            case decEq (toSimpleRect lr1) (toSimpleRect lr2) of
+                Yes pfLR =>
+                    case decEq (toSimpleRect ul1) (toSimpleRect ul2) of
+                        Yes pfUL =>
+                            case decEq (toSimpleRect ur1) (toSimpleRect ur2) of
+                                Yes pfUR => 
+                                    Yes (equalSimpleRectsGiveEqualSizedSumRects ll1 ll2 pfLL lr1 lr2 pfLR ul1 ul2 pfUL ur1 ur2 pfUR {x=x} {y=y} {pfxLow1} {pfxHigh1} {pfyLeft1} {pfyRight1} {pfxLow2} {pfxHigh2} {pfyLeft2} {pfyRight2}) -- (AreEqualSizedSumRects ll1 lr1 ul1 ur1 ll2 lr2 ul2 ur2)
+                                No contraUR => No (upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraUR)
+                        No contraUL => No (upperLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraUL)
+                No contraLR => No (lowerRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraLR)
+        No contraLL => No (lowerLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraLL)
+
 --------------------------------------------------------------------------------
 --                                 Equality                                   --
 --------------------------------------------------------------------------------
@@ -69,8 +267,11 @@ Eq (Rectangle a) where
     (==) (SingleRect a) (SingleRect a) = True
     (==) (SingleRect _) (SumRect _ _ _ _) = False
     (==) (SumRect lowerLHS lowerRhs upperLHS upperRHS) (SingleRect _) = False
-    (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) = ?eqSumRectHole
---     (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) =
+    (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) = ?ha
+        --  case decEqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) of
+        --      Yes sum => True --(lowerLHS1 == lowerLHS2) && (lowerRHS1 == lowerRHS2) && (upperLHS1 == upperLHS2) && (upperRHS1 == upperRHS2)
+        --      No _ => False
+-- --     (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) =
 --         case decEq (toSimpleRect lowerLHS1) (toSimpleRect lowerLHS2) of
 --             Yes pfLHS => 
 --                 case ((replace pfLHS lowerLHS1) == lowerLHS2) of
@@ -92,87 +293,10 @@ Eq (Rectangle a) where
 --                     _ => False
 --             No _ => False
 
--- -- ||| Proofs that two SumRects are actually the same Rectangle.
--- -- data EqualSumRects : Rectangle a -> Rectangle a -> Type where
--- --     SameParts:  (lowerLHS: Rectangle (MkRect x1 y1)) ->
--- --                 (lowerRHS: Rectangle (MkRect x2 y1)) ->
--- --                 (upperLHS: Rectangle (MkRect x1 y2)) ->
--- --                 (upperRHS: Rectangle (MkRect x2 y2)) ->
--- --                 {x: Nat} -> {pfx: plus x1 x2 = x} ->
--- --                 {y: Nat} -> {pfy: plus y1 y2 = y} ->
--- --                 EqualSumRects (SumRect lowerLHS lowerRHS upperLHS upperRHS {x} {y} {pfx} {pfy}) (SumRect lowerLHS lowerRHS upperLHS upperRHS {x} {y} {pfx} {pfy})
-
--- -- Uninhabited (EqualSumRects (SingleRect a) _) where
--- --     uninhabited (SameParts _ _ _ _) impossible
-
--- -- Uninhabited (EqualSumRects _ (SingleRect a)) where
--- --     uninhabited (SameParts _ _ _ _) impossible
-
--- -- ||| Lemma for EqualSumRects r1 r2 -> (r1 = r2)
--- -- equalSumRectsAreEqual: EqualSumRects r1 r2 -> (r1 = r2)
--- -- equalSumRectsAreEqual (SameParts _ _ _ _) = Refl
-
--- lhsTypeMustMatch:   {a: SimpleRectangle} -> 
---                     {b: SimpleRectangle} -> 
---                     (contra: (a = b) -> Void) -> 
---                     (r1: Rectangle a) -> 
---                     (r2: Rectangle b) -> 
---                     (((SumRect r1 _ _ _) = (SumRect r2 _ _ _)) -> Void)
-
-
--- -- ||| Decision procedure for determining if two SumRects are the same.
--- -- decSumRects: 
-
--- DecEq (Rectangle a) where
---   decEq (SingleRect _) (SingleRect _) = Yes Refl
---   decEq (SingleRect _) (SumRect _ _ _ _) = No absurd
---   decEq (SumRect _ _ _ _) (SingleRect _) = No absurd
---   decEq (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) = 
---     case decEq (toSimpleRect lowerLHS1) (toSimpleRect lowerLHS2) of
---         Yes pfLHSType => 
---             case decEq (replace pfLHSType lowerLHS1) lowerLHS2 of
---                 Yes pfLHSEqual => 
---                     case decEq (toSimpleRect lowerRHS1) (toSimpleRect lowerRHS2) of
---                         Yes pfRHSType => 
---                             case decEq (replace pfRHSType lowerRHS1) lowerRHS2 of
---                                 Yes pfLRHSEqual => 
---                                     case decEq (toSimpleRect upperLHS1) (toSimpleRect upperLHS2) of
---                                         Yes pfULHSType => 
---                                             case decEq (replace pfULHSType upperLHS1) upperLHS2 of
---                                                 Yes pfULHSEqual => 
---                                                     case decEq (toSimpleRect upperRHS1) (toSimpleRect upperRHS2) of -- todo: we shouldn't need to check this, make it a property.
---                                                         Yes pfURHSType => 
---                                                             case decEq (replace pfURHSType upperRHS1) upperRHS2 of
---                                                                 Yes pfURHSEqual => Yes ?yesH -- (replace pfLHSEqual (replace pfLRHSEqual (replace pfULHSEqual (replace pfURHSEqual Refl))))
---                                                                 No contraURHS => No ?hNoURHS
---                                                         No contraURHSType => No ?hNoURHSType
---                                                 No contraULHSEqual => No ?hNoULHS
---                                         No contraULHSType => No ?hNoULHSType
---                                 No contraLRHSEqual => No ?hNoLRHS
---                         No contraLRHSType => No ?hNoURHSType
---                 No contraLLHSEqual => No ?hNoLLHS
---         No contraLLHSType => No (?hNoLLHSType contraLLHSType)
-
 
 -- --------------------------------------------------------------------------------
 -- --                                 Views                                      --
 -- --------------------------------------------------------------------------------
-
-
--- -- -- ||| Helper function for comparing rects with a proof that the length and width are equal
--- -- -- rectShoeHorner : {t: Type} -> (a: Rectangle x1 y1) -> (b: Rectangle x2 y2) -> (f: Rectangle x2 y2 -> Rectangle x2 y2 -> t) -> (pfx: x1 = x2) -> (pfy: y1 = y2) -> t
--- -- -- rectShoeHorner a b f pfx pfy = let newRect = replace2 pfx pfy a in
--- -- --                                     f newRect b
-
--- -- -- ||| Helper function for comparing inhomogeneous rects                                
--- -- -- rectComparer : {t: Type} -> {x1:Nat} -> {x2:Nat} -> {y1:Nat} -> {y2:Nat} -> (a: Rectangle x1 y1) -> (b: Rectangle x2 y2) -> (f: Rectangle x2 y2 -> Rectangle x2 y2 -> t) -> Maybe t
--- -- -- rectComparer {x1} {x2} {y1} {y2} a b f = case decEq x1 x2 of
--- -- --                                                     Yes pfx => case decEq y1 y2 of
--- -- --                                                                 Yes pfy => Just (rectShoeHorner a b f pfx pfy)
--- -- --                                                                 No _ => Nothing
--- -- --                                                     No _ => Nothing
-
-
 
 
 
@@ -215,57 +339,15 @@ Eq (Rectangle a) where
 -- -- -- rectToRectangleRow (SumRect lhsLow rhsLow lhsHigh rhsHigh) = 
 -- -- --     SumRows (rectToRectangleRow lhsLow) (rectToRectangleRow rhsLow) (rectToRectangleRow lhsHigh) (rectToRectangleRow rhsHigh)
 
--- -- -- ||| Helper function for pulling a tuple of (length, height) out as a dependent pair
--- -- -- rectToDepPair : Rectangle x y -> (a:(Nat,Nat)**(Rectangle (fst a) (snd a)))
--- -- -- rectToDepPair rect = let a = (rectangleWidth rect, rectangleHeight rect) in
--- -- --                         (a ** rect)
--- -- -- --rectToDepPair rect = ((rectangleWidth rect), (rectangleHeight rect)) ** rect
-
--- -- -- ||| Helper lemma stating that equality of Nats implies equality of rectangle types.
--- -- -- equalNatsgiveEqualRects : (x1=x2) -> (y1=y2) -> ((Rectangle x1 y1) = (Rectangle x2 y2))
--- -- -- equalNatsgiveEqualRects a b = rewrite b in (rewrite a in Refl)
-
--- -- -- implementation [rectUninhabited1] Uninhabited (SingleRect x y = SumRect lhsLow rhsLow lhsHigh rhsHigh) where
--- -- --     uninhabited Refl impossible
-
--- -- -- implementation [rectUninhabitsed2] Uninhabited (SumRect lhsLow rhsLow lhsHigh rhsHigh = SingleRect x y) where
--- -- --     uninhabited Refl impossible    
 
 
--- -- -- ||| Proof that a SumRect is not a SingleRect
--- -- -- data IsSingle : Rectangle x y -> Type where
--- -- --     ItIsSingle : IsSingle (SingleRect x y)
 
--- -- -- implementation [singlecantbesumrect] Uninhabited (IsSingle (SumRect a b c d)) where
--- -- --     uninhabited IsSingle impossible
-
--- -- -- using implementation singlecantbesumrect
--- -- --     ||| A decision procedure for IsSingle
--- -- --     isItSingle : (rect: Rectangle x y) -> Dec (IsSingle rect)
--- -- --     isItSingle (SingleRect x y) = Yes ItIsSingle
--- -- --     isItSingle (SumRect _ _ _ _) = No absurd
 
 -- -- -- ||| A PrimitiveSumRect is a specific SumRect where the constituents are SingleRects    
 -- -- -- data PrimitiveSumRect : Rectangle x1 y1 -> Rectangle x2 y1 -> Rectangle x1 y2 -> Rectangle x2 y2 -> Type where
 -- -- --     MkPrimSumRect : PrimitiveSumRect (SingleRect x1 y1) (SingleRect x2 y1) (SingleRect x1 y2) (SingleRect x2 y2)
 
--- -- -- ||| Proofs of equality for rectangles.
--- -- -- data EqualRect : Rectangle x y -> Rectangle x y -> Type where
--- -- --     ||| There is only one SingleRect of Rectangle x y.
--- -- --     EqualSingle : EqualRect (SingleRect x y) (SingleRect x y)
--- -- --     ||| SumRects are equal if their constituent parts are equal.
--- -- --     EqualSum: (EqualRect lhsLow1 lhsLow2) -> (EqualRect rhsLow1 rhsLow2) -> (EqualRect lhsHigh1 lhsHigh2) -> (EqualRect rhsHigh1 rhsHigh2) ->
--- -- --                 EqualRect (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) (SumRect lhsLow2 rhsLow2 lhsHigh2 rhsHigh2)
 
--- -- -- implementation [singleAndSumNotEqual] Uninhabited (EqualRect (SingleRect x y) (SumRect a b c d)) where
--- -- --     uninhabited EqualRect impossible
-
--- -- -- data EqualPrimitiveSumRect : Rectangle x y -> Rectangle x y -> Type where    
--- -- -- -- using implementation rectUninhabited1
--- -- -- --     DecEq (Rectangle x y) where    
--- -- -- --         decEq (SingleRect x y) (SingleRect x y) = Yes Refl
--- -- -- --         decEq (SingleRect (x1+x2) (y1+y2)) (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) = ?h
--- -- -- --         decEq (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) (SumRect lhsLow2 rhsLow2 lhsHigh2 rhsHigh2) = ?hi
 
 -- -- -- --  decEq {x} {y} {lhsLow: Rectangle x1 y1} {lhsHigh: Rectangle x1 y2} {rhsLow: Rectangle x2 y1} {rhsHigh: Rectangle x2 y2} {pfx: x = x1 + x2} {pfy: y = y1 + y2} (SumRect lhsLow rhsLow lhsHigh rhsHigh) (SumRect lhsLow rhsLow lhsHigh rhsHigh) = ?h
 -- -- -- --  decEq (SingleRect x y) (SumRect _ _ _ _) = ?deh1
@@ -276,23 +358,6 @@ Eq (Rectangle a) where
 -- -- --     ||| The type defines containment here, not the nature of the rectangle. We make LTE explicit to give the compiler a break :) Maybe not necessary.
 -- -- --     IsInRectangle : (x1:Nat) -> (y1:Nat) -> (pfX: (LTE x1 x)) -> (pfY : LTE y1 y) -> ContainedCoordinate rect
 
-
-
--- -- -- ||| A simple datatype to convey which quadrant a sumrect component is in, without having to reference the constuctor
--- -- -- data RectangleQuadrant = 
--- -- --     LHSLow |
--- -- --     LHSHigh |
--- -- --     RHSLow |
--- -- --     RHSHigh
-
--- -- -- ||| Simple helper method mapping a quadrant to Nothing for a SingleRect and to the appropriate component for a SumRect
--- -- -- quadrantToRect: RectangleQuadrant -> (Rectangle x y) -> Maybe (a:(Nat,Nat)**(Rectangle (fst a) (snd a)))
--- -- -- quadrantToRect _ (SingleRect _ _) = Nothing
--- -- -- quadrantToRect x (SumRect lhsLow rhsLow lhsHigh rhsHigh) = case x of
--- -- --                                                             LHSLow => Just (rectToDepPair lhsLow)
--- -- --                                                             LHSHigh => Just (rectToDepPair lhsHigh)
--- -- --                                                             RHSLow => Just (rectToDepPair rhsLow)
--- -- --                                                             RHSHigh => Just (rectToDepPair rhsHigh)
 
 -- -- -- ||| Simple helper method mapping a rect to Nothing for a SingleRect and to the appropriate RectangleQuadrant for a SumRect
 -- -- -- coordToQuadrant : Rectangle x y -> (x1:Nat) -> (y1:Nat) -> {auto pfx: LTE x1 x} -> {auto pfy: LTE y1 y} -> Maybe RectangleQuadrant
@@ -311,53 +376,13 @@ Eq (Rectangle a) where
 -- -- -- --coordInQuadrantView {auto pfx: plus x1 x2 = x} {auto pfy: plus y1 y2 = y} (SumRect lhsLow rhsLow lhsHigh rhsHigh) cc = ?coordInQuadrantView_rhs_2
 
 
--- -- -- ||| Lemma stating that a SumRect will always map to a quadrant
--- -- -- ifNoQuadrantThenNotSumRect : {rect: Rectangle x y} -> {x1: Nat} -> {y1: Nat} -> {auto pfx: LTE x1 x} -> {auto pfy: LTE y1 y} -> (rect = SumRect _ _ _ _) -> (coordToQuadrant rect x1 y1 = Nothing) -> Void
--- -- -- ifNoQuadrantThenNotSumRect {rect} {x1} {y1} prfSumRect prfNoCoord = ?ifNoQuadrantThenNotSumRect_rhs
-
-
-                                                                                                
--- -- -- ||| Lemma stating that if coordToQuadrant rect x y = Nothing then rect is a SingleRect                                                                                                
--- -- -- ifNoQuadrantThenSingleRect : {rect: Rectangle x y} -> {x1: Nat} -> {y1: Nat} -> {auto pfx: LTE x1 x} -> {auto pfy: LTE y1 y} -> (coordToQuadrant rect x1 y1 = Nothing) -> (rect = SingleRect x y)
--- -- -- --ifNoQuadrantThenSingleRect {rect = (SingleRect x y)} prf = Refl
--- -- -- --ifNoQuadrantThenSingleRect {rect = (SumRect lhsLow rhsLow lhsHigh rhsHigh)} prf impossible
--- -- -- -- ifNoQuadrantThenSingleRect {rect = (SingleRect x y)} {x1 = x1} {y1 = y1} prf = Refl
 
 -- -- -- -- generateUniformGrid : (x:Nat) -> (y:Nat) -> Rectangle (x,y)
 -- -- -- -- generateUniformGrid Z Z = SingleRect Z Z
 -- -- -- -- generateUniformGrid (S Z) (S Z) = SingleRect (S Z) (S Z)
 -- -- -- -- generateUniformGrid (S k) (S j) = rewrite ((plus j 1) = S j) in SumRect (generateUniformGrid k j) (generateUniformGrid (S Z) j) (generateUniformGrid k (S Z)) (SingleRect (S Z) (S Z))
 
--- -- -- ||| Definition of congruence for rectangles.
--- -- -- data CongruentRectangle : Rectangle x1 y1 -> Rectangle x2 y2 -> Type where
--- -- --     ||| Congruence for two single rectangles means the side lengths are the same.
--- -- --     CongruentSingle :   CongruentRectangle (SingleRect x y) (SingleRect x y)
--- -- --     ||| Congruence for a two sum-rectangles means the sum components are congruent.
--- -- --     CongruentSum :      (pflhsLow : CongruentRectangle lhsLow1 lhsLow2) ->
--- -- --                         (pfrhsLow : CongruentRectangle rhsLow1 rhsLow2) ->                       
--- -- --                         (pflhsHigh : CongruentRectangle lhsHigh1 lhsHigh2) ->                            
--- -- --                         (pfrhsHigh : CongruentRectangle rhsHigh1 rhsHigh2) ->
--- -- --                         CongruentRectangle (SumRect lhsLow1 rhsLow1 lhsHigh1 rhsHigh1) (SumRect lhsLow2 rhsLow2 lhsHigh2 rhsHigh2)
-
--- -- -- congruenceIsTransitive : {a: Rectangle x1 y1} -> {b: Rectangle x2 y2} -> {c: Rectangle x3 y3} -> (CongruentRectangle a b) -> (CongruentRectangle b c) -> (CongruentRectangle a c)
--- -- -- congruenceIsTransitive CongruentSingle CongruentSingle = CongruentSingle
--- -- -- congruenceIsTransitive (CongruentSum _ _ _ _) CongruentSingle impossible
--- -- -- congruenceIsTransitive CongruentSingle (CongruentSum _ _ _ _) impossible
--- -- -- congruenceIsTransitive (CongruentSum e f g h) (CongruentSum i j k l) = 
--- -- --     CongruentSum (congruenceIsTransitive e i) (congruenceIsTransitive f j) (congruenceIsTransitive g k) (congruenceIsTransitive h l)
-               
--- -- -- equivalentRectangleLemma : (x1: Nat) -> (x: Nat) -> (y1: Nat) -> (y: Nat) -> (gtpfX : LTE x1 x) -> (gtpfY : LTE y1 y) -> (Rectangle x y = (Rectangle ((x1) + (x - x1)) ((y1) + (y - y1))))
--- -- -- equivalentRectangleLemma Z Z Z Z _ _ = Refl
--- -- -- equivalentRectangleLemma Z Z Z (S k) gtpfX gtpfY = Refl
--- -- -- equivalentRectangleLemma _ _ (S k) Z gtpfX gtpfY = absurd gtpfY
--- -- -- equivalentRectangleLemma Z Z (S k) (S j) gtpfX gtpfY = equalNatsgiveEqualRects Refl ( (negativeCancellationLemma (S k) (S j) (gtpfY)))-- ewrite (equalNatsgiveEqualRects Refl (negativeCancellationLemma (S k) (S j) gtpfY)) in ?h
--- -- -- equivalentRectangleLemma Z (S k) Z Z gtpfX gtpfY = Refl
--- -- -- equivalentRectangleLemma Z (S k) Z (S j) gtpfX gtpfY = Refl
--- -- -- equivalentRectangleLemma Z (S k) (S j) (S i) gtpfX gtpfY = equalNatsgiveEqualRects Refl ( (negativeCancellationLemma (S j) (S i) (gtpfY)))
--- -- -- equivalentRectangleLemma (S k) Z _ _ gtpfX gtpfY = absurd gtpfX
--- -- -- equivalentRectangleLemma (S k) (S j) Z Z gtpfX gtpfY = equalNatsgiveEqualRects ( (negativeCancellationLemma (S k) (S j) (gtpfX))) Refl
--- -- -- equivalentRectangleLemma (S k) (S j) Z (S i) gtpfX gtpfY = equalNatsgiveEqualRects ( (negativeCancellationLemma (S k) (S j) (gtpfX))) Refl
--- -- -- equivalentRectangleLemma (S k) (S j) (S i) (S n) gtpfX gtpfY = equalNatsgiveEqualRects ( (negativeCancellationLemma (S k) (S j) (gtpfX))) ( (negativeCancellationLemma (S i) (S n) (gtpfY)))
+              
 
 -- -- -- -- createSubdivision : Rectangle x y -> (x1:Nat) -> (y1: Nat) ->  {auto pfx: LTE x1 x} -> {auto pfy : LTE y1 y} -> Rectangle x y
 -- -- -- -- createSubdivision (SingleRect x y) x1 y1 {pfx} {pfy} = rewrite (equivalentRectangleLemma x1 x y1 y pfx pfy) in ((SumRect (SingleRect x1 y1) (SingleRect (x - x1) y1) (SingleRect x1 (y - y1)) (SingleRect (x - x1) (y - y1))))
