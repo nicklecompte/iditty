@@ -71,6 +71,10 @@ rectangleHeightsAreEqual rect1 rect2 {a} = Refl
 toSimpleRect: Rectangle a -> SimpleRectangle
 toSimpleRect _ {a} = a
 
+||| Two equal Rectangles have the same underlying SimpleRectangle.
+equalRectsHaveEqualSimpleRects : {r1: Rectangle a} -> {r2: Rectangle b} -> (r1 = r2) -> (a = b)
+equalRectsHaveEqualSimpleRects {r1=r1} {r2=r1} Refl = Refl
+
 ||| "Shoehorns" a Rectangle (a) into a Maybe (Rectangle b). Just _ if a = b, Nothing o.w.
 rectangleShoehorner: Rectangle a -> (b: SimpleRectangle) -> Maybe (Rectangle b)
 rectangleShoehorner rect b {a} = case decEq a b of
@@ -111,9 +115,40 @@ rectPairToDepPair : (rect1:Rectangle r) -> (rect2: Rectangle r) ->
 rectPairToDepPair rect1 rect2 = let a = (rectangleWidth rect1, rectangleHeight rect1) in
                                     (a ** ((replaceSimpleRect rect1),(replaceSimpleRect rect2)))
 
+
 --------------------------------------------------------------------------------
 --                             SumRect Comparison                             --
 --------------------------------------------------------------------------------
+
+||| If two SumRects are equal, then their constituent Rectangles are equal.
+equalSumRectsHaveEqualParts: ((SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) = (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2)) ->
+                             ((lowerLHS1=lowerLHS2),(lowerRHS1=lowerRHS2),(upperLHS1=upperLHS2),(upperRHS1=upperRHS2))
+
+equalSumRectsHaveEqualParts {lowerLHS1 = rlLHS} {lowerRHS1 = rlRHS} {upperLHS1 = ruLHS} {upperRHS1 = ruRHS} 
+                            {lowerLHS2 = rlLHS} {lowerRHS2 = rlRHS} {upperLHS2 = ruLHS} {upperRHS2 = ruRHS} Refl 
+                                = (Refl,Refl,Refl,Refl)
+
+||| If two SumRects have equal constituent Rectangles, then they are equal.
+equalPartsGiveEqualSumRects:
+    {lowerLHS1: Rectangle ll} -> {lowerLHS2: Rectangle ll} ->
+    {lowerRHS1: Rectangle lr} -> {lowerRHS2: Rectangle lr} ->
+    {upperLHS1: Rectangle ul} -> {upperLHS2: Rectangle ul} ->
+    {upperRHS1: Rectangle ur} -> {upperRHS2: Rectangle ur} ->
+    (lowerLHS1=lowerLHS2) ->
+    (lowerRHS1=lowerRHS2) ->
+    (upperLHS1=upperLHS2) ->
+    (upperRHS1=upperRHS2) ->
+    {x: Nat} -> {y: Nat} -> 
+    {pfxLow: plus (width ll) (width lr) = x} ->
+    {pfxHigh: plus (width ul) (width ur) = x} -> 
+    {pfyLeft: plus (height ll) (height ul) = y} ->
+    {pfyRight: plus (height lr) (height ur) = y} ->        
+    ((SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {pfxLow = pfxLow1} {pfxHigh = pfxHigh1} {pfyLeft = pfyLeft1} {pfyRight = pfyRight1}) = (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {pfxLow = pfxLow1} {pfxHigh = pfxHigh1} {pfyLeft = pfyLeft1} {pfyRight = pfyRight1}))
+equalPartsGiveEqualSumRects 
+    {lowerLHS1 = r1} {lowerLHS2 = r1} {lowerRHS1 = r2} {lowerRHS2 = r2} 
+    {upperLHS1=r3} {upperLHS2 = r3} {upperRHS1 = r4} {upperRHS2 = r4}
+    Refl Refl Refl Refl =
+        Refl
 
 
 ||| Proofs that two SumRects are "congruent."
@@ -201,8 +236,6 @@ upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects : (contraUR : (toSimple
 upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraUR = 
     (\essr => (contraUR (sameWidthURHSEqualSizedSumRects essr)))
      
-
-
 ||| Lemma stating that if each constituent SimpleRectangle of two SumRects are equal, then the SumRects are equal-sized
 equalSimpleRectsGiveEqualSizedSumRects : 
     (ll1: Rectangle ll1Simp) -> (ll2: Rectangle ll2Simp) ->
@@ -238,7 +271,7 @@ equalSimpleRectsGiveEqualSizedSumRects {ll1Simp = (MkRect width height)} {ll2Sim
 --     EqualSizedSumRects (SumRect ll1 lr1 ul1 ur1 {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect ll2 lr2 ul2 ur2 {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2})
     
 
-||| Decision procedure for deciding if two Rectangles are EqualSizedSumRects. You might not know this, but the diamond antipattern is Actually Good.
+||| Decision procedure for deciding if two Rectangles are EqualSizedSumRects.
 decEqualSizedSumRects: (r1: Rectangle a) -> (r2: Rectangle a) -> Dec (EqualSizedSumRects r1 r2)
 decEqualSizedSumRects (SingleRect a) _ = No absurd
 decEqualSizedSumRects _ (SingleRect a) = No absurd
@@ -251,49 +284,76 @@ decEqualSizedSumRects (SumRect ll1 lr1 ul1 ur1 {x} {y} {pfxLow=pfxLow1} {pfxHigh
                     case decEq (toSimpleRect ul1) (toSimpleRect ul2) of
                         Yes pfUL =>
                             case decEq (toSimpleRect ur1) (toSimpleRect ur2) of
-                                Yes pfUR => 
-                                    Yes (equalSimpleRectsGiveEqualSizedSumRects ll1 ll2 pfLL lr1 lr2 pfLR ul1 ul2 pfUL ur1 ur2 pfUR {x=x} {y=y} {pfxLow1} {pfxHigh1} {pfyLeft1} {pfyRight1} {pfxLow2} {pfxHigh2} {pfyLeft2} {pfyRight2}) -- (AreEqualSizedSumRects ll1 lr1 ul1 ur1 ll2 lr2 ul2 ur2)
+                                Yes pfUR => -- You might not know this, but the diamond antipattern is Actually Good. Or, rather, I think it's impossible to avoid given how I defined a Rectangle and given that each contradiction needs to be handled according to its own type.
+                                    Yes (equalSimpleRectsGiveEqualSizedSumRects ll1 ll2 pfLL lr1 lr2 pfLR ul1 ul2 pfUL ur1 ur2 pfUR {x=x} {y=y} {pfxLow1} {pfxHigh1} {pfyLeft1} {pfyRight1} {pfxLow2} {pfxHigh2} {pfyLeft2} {pfyRight2})
                                 No contraUR => No (upperRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraUR)
                         No contraUL => No (upperLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraUL)
                 No contraLR => No (lowerRightHandSimpleRectMustBeEqualForEqualSizedSumRects contraLR)
         No contraLL => No (lowerLeftHandSimpleRectMustBeEqualForEqualSizedSumRects contraLL)
 
+||| Lemma allowing you to pull the proofs of equality out of an EqualSizedSumRect
+getSameSizeProofsEqSizedSumRect : 
+    {ll1: Rectangle ll1Simp} -> {ll2: Rectangle ll2Simp} ->
+    {lr1: Rectangle lr1Simp} -> {lr2: Rectangle lr2Simp} ->
+    {ul1: Rectangle ul1Simp} -> {ul2: Rectangle ul2Simp} ->
+    {ur1: Rectangle ur1Simp} -> {ur2: Rectangle ur2Simp} ->
+    EqualSizedSumRects 
+        (SumRect ll1 lr1 ul1 ur1 {pfxLow = pfxLow1} {pfxHigh = pfxHigh1} {pfyLeft = pfyLeft1} {pfyRight = pfyRight1}) 
+        (SumRect ll2 lr2 ul2 ur2 {pfxLow = pfxLow2} {pfxHigh = pfxHigh2} {pfyLeft = pfyLeft2} {pfyRight = pfyRight2}) ->
+    ((ll1Simp = ll2Simp),(lr1Simp=lr2Simp),(ul1Simp=ul2Simp),(ur1Simp=ur2Simp))
+getSameSizeProofsEqSizedSumRect (AreEqualSizedSumRects ll1 lr1 ul1 ur1 ll2 lr2 ul2 ur2) = (Refl,Refl,Refl,Refl) -- kind of shocked that this worked 
+                                                                                                                -- but Idris is smarter than me and I won't question it :)
+||| Lemma stating that if two SumRects are equal, they are EqualSizedSumRects
+equalSumRectsAreEqualSized : ((SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) = (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2})) -> 
+                             EqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2)
+equalSumRectsAreEqualSized {lowerLHS1} {lowerRHS1} {upperLHS1} {upperRHS1} {lowerLHS2} {lowerRHS2} {upperLHS2} {upperRHS2} {x} {y} {pfxLow1} {pfxHigh1} {pfyLeft1} {pfyRight1} {pfxLow2} {pfxHigh2} {pfyLeft2} {pfyRight2} pf = 
+    ?eqHole1
+    -- let (pfLl,pfLr,pfUl,pfUr) = (equalSumRectsHaveEqualParts pf) in
+    --     let pfLlhs = (equalRectsHaveEqualSimpleRects pfLl) in
+    --         let pfLrhs = (equalRectsHaveEqualSimpleRects pfLr) in
+    --             let pfUlhs = (equalRectsHaveEqualSimpleRects pfUl) in
+    --                 let pfUrhs = (equalRectsHaveEqualSimpleRects pfUr) in
+    --                     equalSimpleRectsGiveEqualSizedSumRects lowerLHS1 lowerLHS2 pfLlhs lowerRHS1 lowerRHS2 pfLrhs upperLHS1 upperLHS2 pfUlhs upperRHS1 upperRHS2 pfUrhs {x} {y} {pfxLow1=pfxLow1} {pfxHigh1=pfxHigh1} {pfyLeft1=pfyLeft1} {pfyRight1=pfyRight1} {pfxLow2=pfxLow2} {pfxHigh2=pfxHigh2} {pfyLeft2=pfyLeft2} {pfyRight2=pfyRight2}
+
+
 --------------------------------------------------------------------------------
 --                                 Equality                                   --
 --------------------------------------------------------------------------------
 
+-- ||| Lemma stating that if the 
 
 Eq (Rectangle a) where
     (==) (SingleRect a) (SingleRect a) = True
     (==) (SingleRect _) (SumRect _ _ _ _) = False
     (==) (SumRect lowerLHS lowerRhs upperLHS upperRHS) (SingleRect _) = False
-    (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) = ?ha
-        --  case decEqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) of
-        --      Yes sum => True --(lowerLHS1 == lowerLHS2) && (lowerRHS1 == lowerRHS2) && (upperLHS1 == upperLHS2) && (upperRHS1 == upperRHS2)
-        --      No _ => False
--- --     (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) =
---         case decEq (toSimpleRect lowerLHS1) (toSimpleRect lowerLHS2) of
---             Yes pfLHS => 
---                 case ((replace pfLHS lowerLHS1) == lowerLHS2) of
---                     True => 
---                         case decEq (toSimpleRect lowerRHS1) (toSimpleRect lowerRHS2) of
---                             Yes pfRHS => 
---                                 case ((replace pfRHS lowerRHS1) == lowerRHS2) of
---                                     True => case decEq (toSimpleRect upperLHS1) (toSimpleRect upperLHS2) of
---                                                 Yes pfULHS => case ((replace pfULHS upperLHS1) == upperLHS2) of
---                                                                     True => case decEq (toSimpleRect upperRHS1) (toSimpleRect upperRHS2) of -- todo: we shouldn't need to check this, make it a property.
---                                                                                 Yes pfURHS => case ((replace pfURHS upperRHS1) == upperRHS2) of
---                                                                                                 True => True
---                                                                                                 _ => False
---                                                                                 No _ => False
---                                                                     False => False
---                                                 No _ => False
---                                     _ => False
---                             No _ => False
---                     _ => False
---             No _ => False
+    (==) (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2}) =
+        case (decEqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2})) of
+            Yes eqSizedSumRects =>
+                let (pfLlhs,pfLrhs,pfUlhs,pfUrhs) = getSameSizeProofsEqSizedSumRect eqSizedSumRects in
+                    ((replace pfLlhs lowerLHS1) == lowerLHS2) && ((replace pfLrhs lowerRHS1) == lowerRHS2) && ((replace pfUlhs upperLHS1) == upperLHS2) && ((replace pfUrhs upperRHS1) == upperRHS2)
+            No _ => False
 
 
+DecEq (Rectangle a) where
+    decEq (SingleRect a) (SingleRect a) = Yes Refl
+    decEq (SingleRect _) (SumRect _ _ _ _) = No absurd
+    decEq (SumRect lowerLHS lowerRhs upperLHS upperRHS) (SingleRect _) = No absurd
+    decEq (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2}) =
+        case decEqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 {x} {y} {pfxLow=pfxLow1} {pfxHigh=pfxHigh1} {pfyLeft=pfyLeft1} {pfyRight=pfyRight1}) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2 {x} {y} {pfxLow=pfxLow2} {pfxHigh=pfxHigh2} {pfyLeft=pfyLeft2} {pfyRight=pfyRight2}) of
+            Yes eqSizedSumRects =>
+                let (pfLlhs,pfLrhs,pfUlhs,pfUrhs) = getSameSizeProofsEqSizedSumRect eqSizedSumRects in
+                    case decEq (replace pfLlhs lowerLHS1) lowerLHS2 of
+                        Yes llhsEqual =>
+                            case decEq (replace pfLrhs lowerRHS1) lowerRHS2 of
+                                Yes lrhsEqual =>
+                                    case decEq (replace pfUlhs upperLHS1) upperLHS2 of
+                                        Yes ulhsEqual => case decEq (replace pfUrhs upperRHS1) upperRHS2 of
+                                            Yes urhsEqual => Yes ?yesHole
+                                            No urhsContra => No ?noHoleurhs
+                                        No ulhsContra => No ?noHoleulhs
+                                No lrhsContra => No ?noHolelrhs
+                        No llhsContra => No ?noholellhs
+            No notEqualSumRects => No ?notEqualSumRectContra
 -- --------------------------------------------------------------------------------
 -- --                                 Views                                      --
 -- --------------------------------------------------------------------------------
