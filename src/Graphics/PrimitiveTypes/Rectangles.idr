@@ -128,6 +128,37 @@ equalSumRectsHaveEqualParts {lowerLHS1 = rlLHS} {lowerRHS1 = rlRHS} {upperLHS1 =
                             {lowerLHS2 = rlLHS} {lowerRHS2 = rlRHS} {upperLHS2 = ruLHS} {upperRHS2 = ruRHS} Refl 
                                 = (Refl,Refl,Refl,Refl)
 
+||| If two SumRects are equal, then their llhs Rectangles are equal.
+equalSumRectsHaveEqualLLHS: ((SumRect lowerLHS1 _ _ _) = (SumRect lowerLHS2 _ _ _)) ->
+    (lowerLHS1=lowerLHS2)
+equalSumRectsHaveEqualLLHS {lowerLHS1 = r} {lowerLHS2 = r} Refl 
+       = Refl
+
+||| Proofs of equality of LLHS constituent Rectangles can be plumbed through to equal SumRects.
+replaceLlhsSumrect : 
+    {lowerLHS1 : Rectangle a} -> {lowerLHS2 : Rectangle b} ->
+    {pfSimpleRect : a = b} ->
+    ((SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) = (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2)) ->
+    ((SumRect (replace pfSimpleRect lowerLHS1) lowerRHS1 upperLHS1 upperRHS1) = (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2))
+
+||| If two SumRects are equal, then their lrhs Rectangles are equal.
+equalSumRectsHaveEqualLRHS: ((SumRect _ lowerRHS1 _ _) = (SumRect _ lowerRHS2 _ _)) ->
+    (lowerRHS1=lowerRHS2)
+equalSumRectsHaveEqualLRHS {lowerRHS1 = r} {lowerRHS2 = r} Refl 
+       = Refl       
+
+||| If two SumRects are equal, then their ulhs Rectangles are equal.
+equalSumRectsHaveEqualULHS: ((SumRect _ _ upperLHS1 _) = (SumRect _ _ upperLHS2 _)) ->
+    (upperLHS1=upperLHS2)
+equalSumRectsHaveEqualULHS {upperLHS1 = r} {upperLHS2 = r} Refl 
+       = Refl    
+
+||| If two SumRects are equal, then their urhs Rectangles are equal.
+equalSumRectsHaveEqualURHS: ((SumRect _ _ _ upperRHS1) = (SumRect _ _ _ upperRHS2)) ->
+    (upperRHS1=upperRHS2)
+equalSumRectsHaveEqualURHS {upperRHS1 = r} {upperRHS2 = r} Refl 
+       = Refl    
+
 ||| If two SumRects have equal constituent Rectangles, then they are equal.
 equalPartsGiveEqualSumRects:
     {lowerLHS1: Rectangle ll} -> {lowerLHS2: Rectangle ll} ->
@@ -334,6 +365,20 @@ Eq (Rectangle a) where
             No _ => False
 
 
+notEqualSumRectContra : (notEqualSizedSumRects : EqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) -> Void) -> (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 = SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) -> Void
+notEqualSumRectContra notEqualSizedSumRects equalSumRects = notEqualSizedSumRects (equalSumRectsAreEqualSized equalSumRects)
+
+getFirstFrom4Tuple : (a,b,c,d) -> a
+getFirstFrom4Tuple (x,_,_,_) = x
+
+noHolellhs : 
+    {lowerLHS1 : Rectangle rlLHS} -> {lowerLHS2 : Rectangle rlLHS} ->
+    (llhsContra : ((lowerLHS1 = lowerLHS2) -> Void)) -> 
+    ((SumRect lowerLHS1 _ _ _) = (SumRect lowerLHS2 _ _ _)) -> 
+    Void
+noHolellhs {lowerLHS1} {lowerLHS2} llhsContra sumRectEq =
+    llhsContra (equalSumRectsHaveEqualLLHS sumRectEq)
+
 DecEq (Rectangle a) where
     decEq (SingleRect a) (SingleRect a) = Yes Refl
     decEq (SingleRect _) (SumRect _ _ _ _) = No absurd
@@ -349,11 +394,11 @@ DecEq (Rectangle a) where
                                     case decEq (replace pfUlhs upperLHS1) upperLHS2 of
                                         Yes ulhsEqual => case decEq (replace pfUrhs upperRHS1) upperRHS2 of
                                             Yes urhsEqual => Yes ?yesHole
-                                            No urhsContra => No ?noHoleurhs
-                                        No ulhsContra => No ?noHoleulhs
-                                No lrhsContra => No ?noHolelrhs
-                        No llhsContra => No ?noholellhs
-            No notEqualSumRects => No ?notEqualSumRectContra
+                                            No urhsContra => ?a4 --No (\sumRectEq => urhsContra (equalSumRectsHaveEqualURHS sumRectEq))
+                                        No ulhsContra => ?a3 -- No (\sumRectEq => ulhsContra (equalSumRectsHaveEqualULHS sumRectEq))
+                                No lrhsContra => ?a2 --No (\sumRectEq => lrhsContra (equalSumRectsHaveEqualLRHS sumRectEq))
+                        No llhsContra => No (\sumRectEq => llhsContra ((equalSumRectsHaveEqualLLHS (replaceLlhsSumrect {pfSimpleRect = pfLlhs} sumRectEq)))) --(noHolellhs {lowerLHS1 = (replace pfLlhs lowerLHS1)} {lowerLHS2} llhsContra)
+            No notEqualSumRects => No (notEqualSumRectContra notEqualSumRects)
 -- --------------------------------------------------------------------------------
 -- --                                 Views                                      --
 -- --------------------------------------------------------------------------------
