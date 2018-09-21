@@ -1,4 +1,4 @@
-module Graphics.PrimitiveTypes.SimpleRects
+module Graphics.PrimitiveTypes.Rectangles.SimpleRects
 
 import Decidable.Order
 import Common.ArithmeticHelpers

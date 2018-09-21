@@ -6,7 +6,9 @@ sourcedir = src
 
 modules =   Common.ArithmeticHelpers,
             Common.TwoDArray,
-            Graphics.PrimitiveTypes.SimpleRects,
-            Graphics.PrimitiveTypes.Rectangles,
-            Graphics.PrimitiveTypes.RectangleBorders,
+            Graphics.PrimitiveTypes.Rectangles.SimpleRects,
+            Graphics.PrimitiveTypes.Rectangles.Rectangles,
+            Graphics.PrimitiveTypes.Rectangles.SumRectComparison,
+            Graphics.PrimitiveTypes.Rectangles.Equality,
+            Graphics.PrimitiveTypes.Rectangles.RectangleBorders,
             Main
