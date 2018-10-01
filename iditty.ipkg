@@ -10,5 +10,6 @@ modules =   Common.ArithmeticHelpers,
             Graphics.PrimitiveTypes.Rectangles.Rectangles,
             Graphics.PrimitiveTypes.Rectangles.SumRectComparison,
             Graphics.PrimitiveTypes.Rectangles.Equality,
+            Graphics.PrimitiveTypes.Rectangles.Views,
             Graphics.PrimitiveTypes.Rectangles.RectangleBorders,
             Main

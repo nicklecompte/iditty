@@ -20,10 +20,10 @@ data Rectangle : SimpleRectangle -> Type where
                 (upperLHS: Rectangle ruLHS) ->
                 (upperRHS: Rectangle ruRHS) ->
                 {x: Nat} -> {y: Nat} ->
-                {pfxLow: plus (width rlLHS) (width rlRHS) = x} ->
-                {pfxHigh: plus (width ruLHS) (width ruRHS) = x} -> 
-                {pfyLeft: plus (height rlLHS) (height ruLHS) = y} ->
-                {pfyRight: plus (height rlRHS) (height ruRHS) = y} ->
+                (pfxLow: plus (width rlLHS) (width rlRHS) = x) ->
+                (pfxHigh: plus (width ruLHS) (width ruRHS) = x) -> 
+                (pfyLeft: plus (height rlLHS) (height ruLHS) = y) ->
+                (pfyRight: plus (height rlRHS) (height ruRHS) = y) ->
                 Rectangle (MkRect x y)
 
 
@@ -40,10 +40,10 @@ data RectangleQuadrant =
 --                                 Uninhabited/Void                           --
 --------------------------------------------------------------------------------
 
-Uninhabited (SingleRect _ = SumRect _ _ _ _) where
+Uninhabited (SingleRect _ = SumRect _ _ _ _ _ _ _ _) where
     uninhabited Refl impossible
         
-Uninhabited (SumRect _ _ _ _ = SingleRect _) where
+Uninhabited (SumRect _ _ _ _ _ _ _ _ = SingleRect _) where
     uninhabited Refl impossible
 
 --------------------------------------------------------------------------------
@@ -102,7 +102,7 @@ rectToDepPair rect = let a = (rectangleWidth rect, rectangleHeight rect) in
 ||| Simple helper method mapping a quadrant to Nothing for a SingleRect and to the appropriate component for a SumRect
 quadrantToRect: RectangleQuadrant -> (Rectangle r) -> Maybe (a:(Nat,Nat)**(Rectangle (MkRect (fst a) (snd a))))
 quadrantToRect _ (SingleRect _) = Nothing
-quadrantToRect x (SumRect lhsLow rhsLow lhsHigh rhsHigh) = case x of
+quadrantToRect x (SumRect lhsLow rhsLow lhsHigh rhsHigh _ _ _ _) = case x of
                                                             LHSLow => Just (rectToDepPair lhsLow)
                                                             LHSHigh => Just (rectToDepPair lhsHigh)
                                                             RHSLow => Just (rectToDepPair rhsLow)
@@ -114,11 +114,6 @@ rectPairToDepPair : (rect1:Rectangle r) -> (rect2: Rectangle r) ->
 rectPairToDepPair rect1 rect2 = let a = (rectangleWidth rect1, rectangleHeight rect1) in
                                     (a ** ((replaceSimpleRect rect1),(replaceSimpleRect rect2)))
 
-
-
---------------------------------------------------------------------------------
---                                 Equality                                   --
---------------------------------------------------------------------------------
 
 -- --------------------------------------------------------------------------------
 -- --                                 Views                                      --

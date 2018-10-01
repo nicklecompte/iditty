@@ -31,6 +31,8 @@ record SimpleRectangle where
 --                                   Comparison                                 --
 ----------------------------------------------------------------------------------
 
+
+
 ||| Lemma stating that rect1 = rect2 ==> (x rect1) = (x rect2)
 equalSimpleRectsMustHaveEqualWidth : {rect1: SimpleRectangle} -> {rect2: SimpleRectangle} -> (pfRect: rect1 = rect2) -> ((width rect1) = (width rect2))
 equalSimpleRectsMustHaveEqualWidth {rect1 = (MkRect k j)} {rect2 = (MkRect k j)} Refl = Refl
@@ -42,6 +44,21 @@ equalSimpleRectsMustHaveEqualHeight {rect1 = (MkRect k j)} {rect2 = (MkRect k j)
 ||| Lemma for rewriting SimpleRectangles as MkRect
 simpleRectRewriteLemma: (r: SimpleRectangle) -> (r = (MkRect (width r) (height r)))
 simpleRectRewriteLemma (MkRect k j) = Refl
+
+||| Trivial lemma stating that if you have two equal SimpleRects, then arithmetic statements can be plumbed through.
+plusHeightReplaceLemma :
+  {a: SimpleRectangle} -> {b: SimpleRectangle} -> {c: SimpleRectangle} -> (pf: a = b) ->
+  (plus (height a) (height c) =  plus (height b) (height c))
+plusHeightReplaceLemma {a} {b} {c} pf = 
+  (plusConstantRight (height a) (height b) (height c) (equalSimpleRectsMustHaveEqualHeight {rect1=a} {rect2=b} pf))
+
+||| Trivial lemma stating that if you have two equal SimpleRects, then arithmetic statements can be plumbed through.
+plusWidthReplaceLemma :
+  {a: SimpleRectangle} -> {b: SimpleRectangle} -> {c: SimpleRectangle} -> (pf: a = b) ->
+  (plus (width a) (width c) = plus (width b) (width c))
+plusWidthReplaceLemma {a} {b} {c} pf = 
+    (plusConstantRight (width a) (width b) (width c) (equalSimpleRectsMustHaveEqualWidth {rect1=a} {rect2=b} pf))
+  
 
 Eq (SimpleRectangle) where
   (==) rect1 rect2 = ((width rect1) == (width rect2)) && ((height rect1) == (height rect2))

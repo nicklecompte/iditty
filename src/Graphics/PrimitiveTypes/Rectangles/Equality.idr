@@ -22,16 +22,16 @@ Eq (Rectangle a) where
 notEqualSumRectContra : (notEqualSizedSumRects : EqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) -> Void) -> (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 = SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) -> Void
 notEqualSumRectContra notEqualSizedSumRects equalSumRects = notEqualSizedSumRects (equalSumRectsAreEqualSized equalSumRects)
 
-getFirstFrom4Tuple : (a,b,c,d) -> a
-getFirstFrom4Tuple (x,_,_,_) = x
 
-noHolellhs : 
-    {lowerLHS1 : Rectangle rlLHS} -> {lowerLHS2 : Rectangle rlLHS} ->
-    (llhsContra : ((lowerLHS1 = lowerLHS2) -> Void)) -> 
-    ((SumRect lowerLHS1 _ _ _) = (SumRect lowerLHS2 _ _ _)) -> 
+noHolellhs : {lowerLHS1 : Rectangle rlLHS} -> {lowerLHS2 : Rectangle rlRHS1} ->
+    (pfLlhs : rlLHS = rlLHS1) -> 
+    (llhsContra : (replace pfLlhs lowerLHS1 = lowerLHS2) -> Void) -> 
+    (eqSizedSumRects : EqualSizedSumRects (SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1) (SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2)) -> 
+    (sumRectEq : SumRect lowerLHS1 lowerRHS1 upperLHS1 upperRHS1 = SumRect lowerLHS2 lowerRHS2 upperLHS2 upperRHS2) -> 
     Void
-noHolellhs {lowerLHS1} {lowerLHS2} llhsContra sumRectEq =
-    llhsContra (equalSumRectsHaveEqualLLHS sumRectEq)
+noHolellhs {lowerLHS1} {lowerLHS2} pfLlhs llhsContra eqSizedSumRects sumRectEq = 
+    let pfEqualLLHS = (rewrite pfLlhs in (equalSumRectsHaveEqualLLHS sumRectEq)) in
+        ?noHolellhs_rhs 
 
 DecEq (Rectangle a) where
     decEq (SingleRect a) (SingleRect a) = Yes Refl
@@ -51,5 +51,7 @@ DecEq (Rectangle a) where
                                             No urhsContra => ?a4 --No (\sumRectEq => urhsContra (equalSumRectsHaveEqualURHS sumRectEq))
                                         No ulhsContra => ?a3 -- No (\sumRectEq => ulhsContra (equalSumRectsHaveEqualULHS sumRectEq))
                                 No lrhsContra => ?a2 --No (\sumRectEq => lrhsContra (equalSumRectsHaveEqualLRHS sumRectEq))
-                        No llhsContra => No (\sumRectEq => llhsContra ((equalSumRectsHaveEqualLLHS (replaceLlhsSumrect {lowerLHS1 = lowerLHS1} {lowerLHS2=lowerLHS2} {pfSimpleRect = pfLlhs} sumRectEq)))) --(noHolellhs {lowerLHS1 = (replace pfLlhs lowerLHS1)} {lowerLHS2} llhsContra)
+                        No llhsContra => No (\sumRectEq => noHolellhs pfLlhs llhsContra eqSizedSumRects sumRectEq)
+                                                -- llhsContra ((equalSumRectsHaveEqualLLHS 
+                                                --             (replaceLlhsSumrect (sumRectEq))))) --(noHolellhs {lowerLHS1 = (replace pfLlhs lowerLHS1)} {lowerLHS2} llhsContra)
             No notEqualSumRects => No (notEqualSumRectContra notEqualSumRects)
