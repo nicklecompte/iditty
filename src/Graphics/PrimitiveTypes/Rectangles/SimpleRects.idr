@@ -77,21 +77,21 @@ Uninhabited (StrictlyContainedRectangle a a) where
   uninhabited (IsContained a a {pfx} {pfy}) = absurd pfx -- using Uninhabited (LT a a)
 
 data SimpleRectanglePartialOrdering: (smaller: SimpleRectangle) -> (bigger: SimpleRectangle) -> Type where
-  Equal: (rect: SimpleRectangle) -> SimpleRectanglePartialOrdering rect rect
-  Contained: StrictlyContainedRectangle a b -> SimpleRectanglePartialOrdering a b
+  EqualSimpleRect: (rect: SimpleRectangle) -> SimpleRectanglePartialOrdering rect rect
+  ContainedSimpleRect: StrictlyContainedRectangle a b -> SimpleRectanglePartialOrdering a b
 
 Preorder SimpleRectangle SimpleRectanglePartialOrdering where
-  transitive r r r (Equal r) (Equal r) = Equal r
-  transitive r r r1 (Equal r) (Contained (IsContained r r1 {pfx} {pfy})) = (Contained (IsContained r r1 {pfx} {pfy}))
-  transitive r r1 r1 (Contained x) (Equal r1) = Contained x
-  transitive r1 r2 r3 (Contained (IsContained r1 r2 {pfx=pfx12} {pfy=pfy12})) (Contained (IsContained r2 r3 {pfx=pfx23} {pfy=pfy23})) =
-    Contained (IsContained r1 r3 {pfx = ltTransitive pfx12 pfx23} {pfy = ltTransitive pfy12 pfy23})
-  reflexive a = Equal a
+  transitive r r r (EqualSimpleRect r) (EqualSimpleRect r) = EqualSimpleRect r
+  transitive r r r1 (EqualSimpleRect r) (ContainedSimpleRect (IsContained r r1 {pfx} {pfy})) = (ContainedSimpleRect (IsContained r r1 {pfx} {pfy}))
+  transitive r r1 r1 (ContainedSimpleRect x) (EqualSimpleRect r1) = ContainedSimpleRect x
+  transitive r1 r2 r3 (ContainedSimpleRect (IsContained r1 r2 {pfx=pfx12} {pfy=pfy12})) (ContainedSimpleRect (IsContained r2 r3 {pfx=pfx23} {pfy=pfy23})) =
+    ContainedSimpleRect (IsContained r1 r3 {pfx = ltTransitive pfx12 pfx23} {pfy = ltTransitive pfy12 pfy23})
+  reflexive a = EqualSimpleRect a
 
 Poset SimpleRectangle SimpleRectanglePartialOrdering where
-  antisymmetric b b (Equal b) (Equal b) = Refl
-  antisymmetric b b (Equal b) (Contained x) = Refl
-  antisymmetric a a (Contained x) (Equal a) = Refl
-  antisymmetric a b (Contained (IsContained a b {pfx=pfx1})) (Contained (IsContained b a {pfx=pfx2})) = absurd (ltGoesOneWay pfx1 pfx2)
+  antisymmetric b b (EqualSimpleRect b) (EqualSimpleRect b) = Refl
+  antisymmetric b b (EqualSimpleRect b) (ContainedSimpleRect x) = Refl
+  antisymmetric a a (ContainedSimpleRect x) (EqualSimpleRect a) = Refl
+  antisymmetric a b (ContainedSimpleRect (IsContained a b {pfx=pfx1})) (ContainedSimpleRect (IsContained b a {pfx=pfx2})) = absurd (ltGoesOneWay pfx1 pfx2)
 
 

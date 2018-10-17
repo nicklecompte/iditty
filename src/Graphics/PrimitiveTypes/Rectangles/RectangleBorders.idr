@@ -1,6 +1,6 @@
 module Graphics.PrimitiveTypes.RectangleBorders
 
-import Graphics.PrimitiveTypes.Rectangles
+import Graphics.PrimitiveTypes.Rectangles.Rectangles
 
 %access public export
 
